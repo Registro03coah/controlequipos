@@ -31,6 +31,7 @@ let targetScannerInputId = null;
 
 // Variables temporales para imágenes base64
 let currentCompPhoto = "";
+let currentOpCompPhoto = "";
 let currentOpPhoto = "";
 let currentFaultPhoto = "";
 
@@ -174,6 +175,7 @@ function previewImageFile(event, previewDivId, imgId, targetVarName) {
             const compressed = canvas.toDataURL("image/jpeg", 0.72);
 
             if (targetVarName === "currentCompPhoto") currentCompPhoto = compressed;
+            if (targetVarName === "currentOpCompPhoto") currentOpCompPhoto = compressed;
             if (targetVarName === "currentOpPhoto") currentOpPhoto = compressed;
             if (targetVarName === "currentFaultPhoto") currentFaultPhoto = compressed;
 
@@ -189,6 +191,7 @@ function clearImageField(inputId, previewDivId, targetVarName) {
     document.getElementById(inputId).value = "";
     document.getElementById(previewDivId).classList.add("d-none");
     if (targetVarName === "currentCompPhoto") currentCompPhoto = "";
+    if (targetVarName === "currentOpCompPhoto") currentOpCompPhoto = "";
     if (targetVarName === "currentOpPhoto") currentOpPhoto = "";
     if (targetVarName === "currentFaultPhoto") currentFaultPhoto = "";
 }
@@ -318,6 +321,105 @@ function switchOpTab(tab) {
     document.getElementById("opSectionFallas").classList.toggle("d-none", tab !== "fallas");
 }
 
+function populateOperatorFormDropdowns() {
+    const brandSel = document.getElementById("opCompMarca");
+    const currBrand = brandSel.value;
+    brandSel.innerHTML = appState.brands.map(b => `<option value="${b}">${b}</option>`).join("");
+    if (currBrand && appState.brands.includes(currBrand)) brandSel.value = currBrand;
+
+    const typeSel = document.getElementById("opCompTipo");
+    const currType = typeSel.value;
+    typeSel.innerHTML = appState.types.map(t => `<option value="${t}">${t}</option>`).join("");
+    if (currType && appState.types.includes(currType)) typeSel.value = currType;
+}
+
+async function saveOperatorComponent(e) {
+    e.preventDefault();
+    if (!currentUser || currentUser.role !== "operator") return;
+
+    const editId = document.getElementById("opEditCompId").value;
+    const modulo = currentUser.modulo;
+    const estacion = Number(currentUser.estacion);
+    const tipo = document.getElementById("opCompTipo").value;
+    const marca = document.getElementById("opCompMarca").value;
+    const modelo = document.getElementById("opCompModelo").value.trim();
+    const serie = document.getElementById("opCompSerie").value.trim().toUpperCase();
+    const estado = document.getElementById("opCompEstado").value;
+    const notas = document.getElementById("opCompNotas").value.trim();
+
+    const dup = appState.components.find(c => c.serie === serie && c.id !== editId);
+    if (dup) {
+        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - Estación ${dup.estacion}.`);
+        return;
+    }
+
+    if (editId) {
+        const idx = appState.components.findIndex(c => c.id === editId && c.modulo === modulo && Number(c.estacion) === estacion);
+        if (idx !== -1) {
+            appState.components[idx] = {
+                ...appState.components[idx],
+                tipo, marca, modelo, serie, estado, notas,
+                foto: currentOpCompPhoto || appState.components[idx].foto,
+                registradoPor: currentUser.operator.nombre
+            };
+        }
+    } else {
+        appState.components.push({
+            id: "CMP-" + Date.now(),
+            modulo,
+            estacion,
+            tipo,
+            marca,
+            modelo,
+            serie,
+            estado,
+            notas,
+            foto: currentOpCompPhoto,
+            registradoPor: currentUser.operator.nombre,
+            fechaRegistro: new Date().toLocaleString("es-MX")
+        });
+    }
+
+    await saveState();
+    resetOpComponentForm();
+    refreshOperatorUI();
+}
+
+function editOperatorComponent(id) {
+    if (!currentUser || currentUser.role !== "operator") return;
+    const c = appState.components.find(item => item.id === id && item.modulo === currentUser.modulo && Number(item.estacion) === Number(currentUser.estacion));
+    if (!c) return;
+
+    populateOperatorFormDropdowns();
+    document.getElementById("opEditCompId").value = c.id;
+    document.getElementById("opCompTipo").value = c.tipo;
+    document.getElementById("opCompMarca").value = c.marca;
+    document.getElementById("opCompModelo").value = c.modelo;
+    document.getElementById("opCompSerie").value = c.serie;
+    document.getElementById("opCompEstado").value = c.estado === "Baja" ? "En Revisión" : c.estado;
+    document.getElementById("opCompNotas").value = c.notas || "";
+
+    currentOpCompPhoto = c.foto || "";
+    if (c.foto) {
+        document.getElementById("opCompPhotoImg").src = c.foto;
+        document.getElementById("opCompPhotoPreview").classList.remove("d-none");
+    } else {
+        document.getElementById("opCompPhotoPreview").classList.add("d-none");
+    }
+
+    document.getElementById("opCompFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente de mi Estación`;
+    document.getElementById("btnOpCancelEditComp").classList.remove("d-none");
+}
+
+function resetOpComponentForm() {
+    document.getElementById("opComponentForm").reset();
+    document.getElementById("opEditCompId").value = "";
+    clearImageField("opCompFotoInput", "opCompPhotoPreview", "currentOpCompPhoto");
+    document.getElementById("opCompFormTitle").innerHTML = `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estación`;
+    document.getElementById("btnOpCancelEditComp").classList.add("d-none");
+    populateOperatorFormDropdowns();
+}
+
 function refreshOperatorUI() {
     const { modulo, estacion, operator } = currentUser;
     document.getElementById("opCardPhoto").src = operator.foto || DEFAULT_AVATAR;
@@ -327,12 +429,14 @@ function refreshOperatorUI() {
     document.getElementById("opCardPhone").textContent = operator.telefono;
     document.getElementById("opCardEmail").textContent = operator.correo;
 
+    populateOperatorFormDropdowns();
+
     const myComps = appState.components.filter(c => c.modulo === modulo && Number(c.estacion) === estacion);
     document.getElementById("opTotalComponents").textContent = `${myComps.length} equipos`;
 
     const tbody = document.getElementById("opComponentsTableBody");
     if (myComps.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Aún no hay componentes registrados por el Administrador en esta estación.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Aún no has registrado componentes en esta estación. Usa el formulario para agregarlos.</td></tr>`;
     } else {
         tbody.innerHTML = myComps.map(c => `
             <tr>
@@ -346,9 +450,14 @@ function refreshOperatorUI() {
                 <td><span class="font-monospace fw-semibold bg-light px-2 py-1 rounded border">${c.serie}</span></td>
                 <td>${getStatusBadge(c.estado)}</td>
                 <td class="text-end">
-                    <button class="btn btn-sm btn-outline-danger fw-semibold" onclick="openReportFaultModal('${c.id}')">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Reportar Falla
-                    </button>
+                    <div class="d-flex justify-content-end gap-1 flex-wrap">
+                        <button class="btn btn-sm btn-outline-primary" title="Editar componente" onclick="editOperatorComponent('${c.id}')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger fw-semibold" onclick="openReportFaultModal('${c.id}')">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Reportar Falla
+                        </button>
+                    </div>
                 </td>
             </tr>
         `).join("");
@@ -514,6 +623,7 @@ async function saveComponent(e) {
             estado,
             notas,
             foto: currentCompPhoto,
+            registradoPor: "Administrador",
             fechaRegistro: new Date().toLocaleString("es-MX")
         });
     }
@@ -833,7 +943,6 @@ async function submitFaultReport(e) {
         descripcion: document.getElementById("faultDescription").value.trim(),
         foto: currentFaultPhoto,
         estatus: "Pendiente de Atención",
-        // Campos de cierre / solución
         fechaSolucion: "",
         tecnicoSolucion: "",
         tipoSolucion: "",
@@ -1109,6 +1218,7 @@ function exportInventoryExcel() {
             "Modelo": c.modelo,
             "Número de Serie": c.serie,
             "Estado": c.estado,
+            "Registrado Por": c.registradoPor || "Administrador",
             "Observaciones": c.notas || "",
             "Fecha Registro": c.fechaRegistro || ""
         };
@@ -1119,7 +1229,7 @@ function exportInventoryExcel() {
     ws["!cols"] = [
         { wch: 5 }, { wch: 12 }, { wch: 12 }, { wch: 28 }, { wch: 16 },
         { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 22 },
-        { wch: 14 }, { wch: 25 }, { wch: 20 }
+        { wch: 14 }, { wch: 22 }, { wch: 25 }, { wch: 20 }
     ];
     XLSX.utils.book_append_sheet(wb, ws, "Inventario Componentes");
 
@@ -1189,6 +1299,9 @@ Object.assign(window, {
     loginAsAdmin,
     logout,
     switchOpTab,
+    saveOperatorComponent,
+    editOperatorComponent,
+    resetOpComponentForm,
     switchAdminTab,
     onAdminCompModuloChange,
     updateCompAssignedOperatorHint,
