@@ -117,7 +117,7 @@
 
         <div class="container-fluid px-3 px-lg-4 py-4">
 
-            <!-- ================= VISTA DEL OPERADOR (SOLO LECTURA + REPORTAR/FINALIZAR FALLA) ================= -->
+            <!-- ================= VISTA DEL OPERADOR (REGISTRO PROPIO + FALLAS, SIN BORRAR) ================= -->
             <div id="operatorView" class="d-none">
                 <!-- Ficha de Identidad del Operador -->
                 <div class="card card-custom p-3 p-md-4 mb-4">
@@ -138,7 +138,7 @@
                         </div>
                         <div class="col-md-auto text-md-end">
                             <span class="badge bg-secondary-subtle text-secondary border px-3 py-2">
-                                <i class="bi bi-eye-fill me-1"></i>Modo Consulta y Reporte de Fallas
+                                <i class="bi bi-shield-check me-1"></i>Registro y Fallas de Estación (Sin Borrado)
                             </span>
                         </div>
                     </div>
@@ -148,42 +148,117 @@
                 <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm">
                     <li class="nav-item">
                         <button class="nav-link active" id="op-tab-equipos" onclick="switchOpTab('equipos')">
-                            <i class="bi bi-pc-display me-1"></i> Equipos de mi Estación
+                            <i class="bi bi-pc-display me-1"></i> Mis Componentes y Registro
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="op-tab-fallas" onclick="switchOpTab('fallas')">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Mis Reportes de Falla
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Reportes de Falla
                             <span class="badge bg-danger ms-1" id="opFaultCountBadge">0</span>
                         </button>
                     </li>
                 </ul>
 
-                <!-- Tab 1 Operador: Lista de Equipos Asignados -->
+                <!-- Tab 1 Operador: Registrar y Ver Componentes de su Estación -->
                 <div id="opSectionEquipos">
-                    <div class="card card-custom p-3 p-md-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                            <div>
-                                <h5 class="fw-bold mb-0"><i class="bi bi-hdd-rack me-2 text-danger"></i>Componentes Asignados a tu Estación</h5>
-                                <small class="text-muted">Si algún equipo presenta fallas, presiona "Reportar Falla" para generar su formato oficial.</small>
+                    <div class="row g-4">
+                        <!-- Formulario del Operador para Registrar/Editar Componentes de su Estación -->
+                        <div class="col-lg-4">
+                            <div class="card card-custom p-3 p-md-4">
+                                <h5 class="fw-bold mb-3" id="opCompFormTitle">
+                                    <i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estación
+                                </h5>
+                                <form id="opComponentForm" onsubmit="saveOperatorComponent(event)">
+                                    <input type="hidden" id="opEditCompId" value="">
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Tipo de Componente *</label>
+                                        <select class="form-select" id="opCompTipo" required></select>
+                                    </div>
+
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label fw-semibold small">Marca *</label>
+                                            <select class="form-select" id="opCompMarca" required></select>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label fw-semibold small">Modelo *</label>
+                                            <input type="text" class="form-control" id="opCompModelo" placeholder="Ej. OptiPlex 7090" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Número de Serie / Código de Barras *</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control fw-bold" id="opCompSerie" placeholder="Escanea o escribe..." required>
+                                            <button class="btn btn-dark" type="button" onclick="openScanner('opCompSerie')">
+                                                <i class="bi bi-upc-scan me-1"></i>Escanear
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Estado Físico</label>
+                                        <select class="form-select" id="opCompEstado">
+                                            <option value="Operativo">Operativo</option>
+                                            <option value="En Falla">En Falla</option>
+                                            <option value="En Revisión">En Revisión</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Fotografía del Componente</label>
+                                        <input type="file" class="form-control" id="opCompFotoInput" accept="image/*" capture="environment" onchange="previewImageFile(event, 'opCompPhotoPreview', 'opCompPhotoImg', 'currentOpCompPhoto')">
+                                        <div id="opCompPhotoPreview" class="mt-2 d-none text-center">
+                                            <img id="opCompPhotoImg" src="" alt="Vista previa" class="img-thumbnail" style="max-height: 120px;">
+                                            <button type="button" class="btn btn-sm btn-link text-danger d-block mx-auto" onclick="clearImageField('opCompFotoInput', 'opCompPhotoPreview', 'currentOpCompPhoto')">Quitar foto</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Observaciones</label>
+                                        <input type="text" class="form-control" id="opCompNotas" placeholder="Opcional: Inventario, cables, detalles...">
+                                    </div>
+
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-pink">
+                                            <i class="bi bi-save me-1"></i>Guardar en mi Estación
+                                        </button>
+                                        <button type="button" id="btnOpCancelEditComp" class="btn btn-outline-secondary d-none" onclick="resetOpComponentForm()">
+                                            Cancelar Edición
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
-                            <span class="badge bg-dark fs-6" id="opTotalComponents">0 equipos</span>
                         </div>
 
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Foto</th>
-                                        <th>Componente</th>
-                                        <th>Marca y Modelo</th>
-                                        <th>N° Serie / Código</th>
-                                        <th>Estado</th>
-                                        <th class="text-end">Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="opComponentsTableBody"></tbody>
-                            </table>
+                        <!-- Tabla de Componentes de la Estación del Operador -->
+                        <div class="col-lg-8">
+                            <div class="card card-custom p-3 p-md-4">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                                    <div>
+                                        <h5 class="fw-bold mb-0"><i class="bi bi-hdd-rack me-2 text-danger"></i>Componentes de tu Estación</h5>
+                                        <small class="text-muted">Puedes registrar, editar y reportar fallas. El borrado definitivo corresponde al Administrador.</small>
+                                    </div>
+                                    <span class="badge bg-dark fs-6" id="opTotalComponents">0 equipos</span>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Foto</th>
+                                                <th>Componente</th>
+                                                <th>Marca y Modelo</th>
+                                                <th>N° Serie / Código</th>
+                                                <th>Estado</th>
+                                                <th class="text-end">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="opComponentsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -269,7 +344,6 @@
                 <!-- SECCIÓN ADMIN 1: INVENTARIO Y REGISTRO DE COMPONENTES -->
                 <div id="admSectionInventario">
                     <div class="row g-4">
-                        <!-- Formulario de Registro de Componentes (Exclusivo Admin) -->
                         <div class="col-lg-4">
                             <div class="card card-custom p-3 p-md-4">
                                 <h5 class="fw-bold mb-3" id="compFormTitle">
@@ -359,7 +433,6 @@
                             </div>
                         </div>
 
-                        <!-- Tabla Global de Inventario + Exportación Excel -->
                         <div class="col-lg-8">
                             <div class="card card-custom p-3 p-md-4">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
@@ -505,7 +578,6 @@
                 <!-- SECCIÓN ADMIN 3: CONFIGURACIÓN DE ESTACIONES, MARCAS Y TIPOS -->
                 <div id="admSectionConfig" class="d-none">
                     <div class="row g-4">
-                        <!-- Cantidad de Estaciones por Módulo -->
                         <div class="col-lg-4">
                             <div class="card card-custom p-4 h-100">
                                 <h5 class="fw-bold mb-3"><i class="bi bi-building-gear text-danger me-2"></i>Estaciones por Módulo</h5>
@@ -528,7 +600,6 @@
                             </div>
                         </div>
 
-                        <!-- Catálogo de Marcas Disponibles -->
                         <div class="col-lg-4">
                             <div class="card card-custom p-4 h-100">
                                 <h5 class="fw-bold mb-3"><i class="bi bi-tags-fill text-danger me-2"></i>Catálogo de Marcas</h5>
@@ -541,7 +612,6 @@
                             </div>
                         </div>
 
-                        <!-- Catálogo de Tipos de Componentes -->
                         <div class="col-lg-4">
                             <div class="card card-custom p-4 h-100">
                                 <h5 class="fw-bold mb-3"><i class="bi bi-pc text-danger me-2"></i>Tipos de Componentes</h5>
