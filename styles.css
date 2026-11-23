@@ -1,0 +1,183 @@
+:root {
+    --ine-pink: #D5007F;
+    --ine-pink-dark: #a80064;
+    --ine-dark: #1E242B;
+    --ine-slate: #334155;
+    --bg-light: #F1F5F9;
+}
+
+body {
+    background-color: var(--bg-light);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #1e293b;
+}
+
+.navbar-mac {
+    background: linear-gradient(135deg, var(--ine-dark) 0%, #2c3540 100%);
+    border-bottom: 4px solid var(--ine-pink);
+}
+
+.btn-pink {
+    background-color: var(--ine-pink);
+    border-color: var(--ine-pink);
+    color: #fff;
+    font-weight: 600;
+}
+
+.btn-pink:hover, .btn-pink:focus {
+    background-color: var(--ine-pink-dark);
+    border-color: var(--ine-pink-dark);
+    color: #fff;
+}
+
+.card-custom {
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    background: #ffffff;
+}
+
+.stat-card {
+    border-left: 5px solid var(--ine-pink);
+    transition: transform 0.15s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.avatar-operator {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid var(--ine-pink);
+    background-color: #e2e8f0;
+}
+
+.avatar-table {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #cbd5e1;
+}
+
+.img-thumb {
+    width: 52px;
+    height: 52px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
+    transition: transform 0.2s;
+}
+
+.img-thumb:hover {
+    transform: scale(1.12);
+}
+
+.nav-pills .nav-link {
+    color: var(--ine-slate);
+    font-weight: 600;
+    border-radius: 10px;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--ine-pink);
+    color: #fff;
+}
+
+#reader {
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+}
+
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at top right, #2e3742, #15191e);
+    padding: 1rem;
+}
+
+.login-card {
+    max-width: 470px;
+    width: 100%;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+.login-header {
+    background: var(--ine-dark);
+    border-bottom: 4px solid var(--ine-pink);
+    padding: 1.5rem;
+    text-align: center;
+    color: white;
+}
+
+/* Estilos exclusivos para el formato imprimible */
+.print-sheet {
+    background: #fff;
+    padding: 28px 34px;
+    border: 1px solid #cbd5e1;
+    color: #000;
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+
+.print-box {
+    border: 1px solid #334155;
+    padding: 9px 12px;
+    margin-bottom: 10px;
+}
+
+.print-box-title {
+    background-color: #e2e8f0;
+    font-weight: 700;
+    padding: 4px 8px;
+    margin: -9px -12px 8px -12px;
+    border-bottom: 1px solid #334155;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+}
+
+.print-box-title-solved {
+    background-color: #d1fae5;
+    color: #065f46;
+    font-weight: 700;
+    padding: 4px 8px;
+    margin: -9px -12px 8px -12px;
+    border-bottom: 1px solid #334155;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+}
+
+@media print {
+    body * {
+        visibility: hidden !important;
+    }
+    #printFormatArea, #printFormatArea * {
+        visibility: visible !important;
+    }
+    #printFormatArea {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        border: none !important;
+        padding: 10px !important;
+        margin: 0 !important;
+        background: #fff !important;
+        z-index: 99999;
+    }
+    .no-print {
+        display: none !important;
+    }
+}
