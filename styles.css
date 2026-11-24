@@ -1,27 +1,67 @@
 :root {
     --ine-pink: #D5007F;
-    --ine-pink-dark: #a80064;
-    --ine-dark: #1E242B;
-    --ine-slate: #334155;
-    --bg-light: #F1F5F9;
+    --ine-pink-dark: #a60062;
+    --ine-dark: #1e293b;
 }
 
 body {
-    background-color: var(--bg-light);
+    background-color: #f1f5f9;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 8px;
     color: #1e293b;
 }
 
-.navbar-mac {
-    background: linear-gradient(135deg, var(--ine-dark) 0%, #2c3540 100%);
+/* Jerarquía tipográfica solicitada: Títulos 10px, textos generales 8px */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+.navbar-brand span,
+.modal-title,
+.card-title {
+    font-size: 10px !important;
+    font-weight: 700;
+}
+
+p, span, div, label, input, select, textarea, button, a,
+.btn, .form-control, .form-select, .badge, .nav-link,
+.table, .table th, .table td, .alert, .small, small {
+    font-size: 8px !important;
+}
+
+.login-wrapper {
+    min-height: calc(100vh - 28px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #D5007F 100%);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 440px;
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+
+.login-header {
+    background-color: var(--ine-dark);
+    color: #fff;
+    padding: 20px 16px;
+    text-align: center;
     border-bottom: 4px solid var(--ine-pink);
+}
+
+.navbar-mac {
+    background-color: var(--ine-dark);
+    border-bottom: 3px solid var(--ine-pink);
 }
 
 .btn-pink {
     background-color: var(--ine-pink);
     border-color: var(--ine-pink);
     color: #fff;
-    font-weight: 600;
 }
 
 .btn-pink:hover, .btn-pink:focus {
@@ -30,152 +70,121 @@ body {
     color: #fff;
 }
 
+.nav-pills .nav-link {
+    color: #475569;
+    font-weight: 600;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--ine-pink) !important;
+    color: #fff !important;
+}
+
 .card-custom {
     border: none;
-    border-radius: 14px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
 }
 
 .stat-card {
-    border-left: 5px solid var(--ine-pink);
-    transition: transform 0.15s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
+    border-left: 4px solid var(--ine-pink);
 }
 
 .avatar-operator {
-    width: 64px;
-    height: 64px;
-    object-fit: cover;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    border: 3px solid var(--ine-pink);
+    object-fit: cover;
+    border: 2px solid var(--ine-pink);
     background-color: #e2e8f0;
 }
 
 .avatar-table {
-    width: 44px;
-    height: 44px;
-    object-fit: cover;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
-    border: 2px solid #cbd5e1;
+    object-fit: cover;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
 }
 
 .img-thumb {
-    width: 52px;
-    height: 52px;
+    width: 34px;
+    height: 34px;
     object-fit: cover;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
     border: 1px solid #cbd5e1;
-    transition: transform 0.2s;
 }
 
-.img-thumb:hover {
-    transform: scale(1.12);
-}
-
-.nav-pills .nav-link {
-    color: var(--ine-slate);
-    font-weight: 600;
-    border-radius: 10px;
-}
-
-.nav-pills .nav-link.active {
-    background-color: var(--ine-pink);
-    color: #fff;
-}
-
-#reader {
-    width: 100%;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #000;
-}
-
-.login-wrapper {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at top right, #2e3742, #15191e);
-    padding: 1rem;
-}
-
-.login-card {
-    max-width: 470px;
-    width: 100%;
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-}
-
-.login-header {
-    background: var(--ine-dark);
-    border-bottom: 4px solid var(--ine-pink);
-    padding: 1.5rem;
+/* Pie de página institucional */
+.app-footer {
+    background-color: var(--ine-dark);
+    color: #cbd5e1;
+    border-top: 2px solid var(--ine-pink);
+    padding: 7px 16px;
     text-align: center;
-    color: white;
+    font-size: 8px !important;
 }
 
-/* Estilos exclusivos para el formato imprimible */
+/* Formato imprimible (Hoja de Servicio) */
 .print-sheet {
     background: #fff;
-    padding: 28px 34px;
-    border: 1px solid #cbd5e1;
+    padding: 24px;
+    max-width: 780px;
     color: #000;
-    font-size: 12.5px;
-    line-height: 1.4;
+    border: 1px solid #cbd5e1;
+}
+
+.print-sheet h5 {
+    font-size: 11px !important;
+}
+
+.print-sheet div, .print-sheet p, .print-sheet span, .print-sheet small, .print-sheet strong {
+    font-size: 9px !important;
 }
 
 .print-box {
     border: 1px solid #334155;
-    padding: 9px 12px;
+    padding: 8px 10px;
     margin-bottom: 10px;
+    border-radius: 4px;
 }
 
 .print-box-title {
-    background-color: #e2e8f0;
+    background-color: #f1f5f9;
     font-weight: 700;
-    padding: 4px 8px;
-    margin: -9px -12px 8px -12px;
+    padding: 3px 6px;
+    margin: -8px -10px 6px -10px;
     border-bottom: 1px solid #334155;
     text-transform: uppercase;
-    font-size: 11px;
-    letter-spacing: 0.4px;
 }
 
 .print-box-title-solved {
     background-color: #d1fae5;
     color: #065f46;
     font-weight: 700;
-    padding: 4px 8px;
-    margin: -9px -12px 8px -12px;
-    border-bottom: 1px solid #334155;
+    padding: 3px 6px;
+    margin: -8px -10px 6px -10px;
+    border-bottom: 1px solid #065f46;
     text-transform: uppercase;
-    font-size: 11px;
-    letter-spacing: 0.4px;
 }
 
 @media print {
     body * {
-        visibility: hidden !important;
+        visibility: hidden;
     }
     #printFormatArea, #printFormatArea * {
-        visibility: visible !important;
+        visibility: visible;
     }
     #printFormatArea {
         position: fixed;
         left: 0;
         top: 0;
         width: 100%;
-        border: none !important;
-        padding: 10px !important;
-        margin: 0 !important;
-        background: #fff !important;
-        z-index: 99999;
+        border: none;
+        box-shadow: none !important;
+        padding: 10px;
     }
     .no-print {
         display: none !important;
