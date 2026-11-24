@@ -48,7 +48,7 @@
                 <form id="operatorLoginForm" onsubmit="loginAsOperator(event)">
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Selecciona tu Módulo MAC</label>
-                        <select class="form-select form-select-lg" id="loginModulo" required onchange="updateLoginStations()">
+                        <select class="form-select form-select-lg" id="loginModulo" required onchange="onLoginModuloChange()">
                             <option value="050351">Módulo 050351</option>
                             <option value="050353">Módulo 050353</option>
                             <option value="050354">Módulo 050354</option>
@@ -321,7 +321,7 @@
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="adm-tab-operadores" onclick="switchAdminTab('operadores')">
-                            <i class="bi bi-people-fill me-1"></i> 2. Operadores y Responsables (Est. 0)
+                            <i class="bi bi-people-fill me-1"></i> 2. Registro de Operadores de MAC Distrito 03
                         </button>
                     </li>
                     <li class="nav-item">
@@ -479,7 +479,7 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN ADMIN 2: OPERADORES Y RESPONSABLES DE MÓDULO (ESTACIÓN 0) -->
+                <!-- SECCIÓN ADMIN 2: REGISTRO DE OPERADORES DE MAC DISTRITO 03 -->
                 <div id="admSectionOperadores" class="d-none">
                     <div class="row g-4">
                         <div class="col-lg-4">
@@ -492,7 +492,7 @@
                                     <div class="row g-2 mb-3">
                                         <div class="col-6">
                                             <label class="form-label fw-semibold small">Módulo MAC *</label>
-                                            <select class="form-select" id="opRegModulo" required onchange="updateOpRegStations()">
+                                            <select class="form-select" id="opRegModulo" required onchange="onOpRegModuloChange()">
                                                 <option value="050351">050351</option>
                                                 <option value="050353">050353</option>
                                                 <option value="050354">050354</option>
@@ -547,8 +547,8 @@
 
                         <div class="col-lg-8">
                             <div class="card card-custom p-3 p-md-4">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="fw-bold mb-0"><i class="bi bi-person-lines-fill text-danger me-2"></i>Responsables de Módulo (Est. 0) y Operadores</h5>
+                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                                    <h5 class="fw-bold mb-0"><i class="bi bi-person-lines-fill text-danger me-2"></i>Registro de Operadores de MAC Distrito 03</h5>
                                     <select class="form-select w-auto" id="filterOpModulo" onchange="renderOperatorsTable()">
                                         <option value="ALL">Todos los Módulos</option>
                                         <option value="050351">Módulo 050351</option>
