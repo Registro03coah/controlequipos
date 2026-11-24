@@ -3,6 +3,7 @@ import { STATE_DOC_REF, setDoc, onSnapshot } from "./firebase-config.js";
 // ==================== CONFIGURACIÓN Y ESTADO ====================
 const ADMIN_PASS = "admin123";
 const LOCAL_CACHE_KEY = "macs_inventory_cache_v1";
+const SESSION_STORAGE_KEY = "macs_active_session_v1";
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cbd5e1'/><circle cx='50' cy='38' r='18' fill='%2364748b'/><path d='M20 88 C20 65, 80 65, 80 88' fill='%2364748b'/></svg>";
 
 const DEFAULT_STATE = {
@@ -27,6 +28,8 @@ const DEFAULT_STATE = {
 
 let appState = loadLocalCache();
 let currentUser = null;
+let activeAdminTab = "inventario";
+let activeOpTab = "equipos";
 let html5QrCode = null;
 let targetScannerInputId = null;
 
@@ -35,6 +38,44 @@ let currentCompPhoto = "";
 let currentOpCompPhoto = "";
 let currentOpPhoto = "";
 let currentFaultPhoto = "";
+
+// ==================== PERSISTENCIA DE SESIÓN AL REFRESCAR ====================
+function persistSession() {
+    try {
+        if (currentUser) {
+            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+                user: currentUser,
+                adminTab: activeAdminTab,
+                opTab: activeOpTab
+            }));
+        } else {
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+    } catch (e) {
+        console.warn("No se pudo guardar sesión:", e);
+    }
+}
+
+function restoreSession() {
+    try {
+        const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.user) return false;
+
+        currentUser = parsed.user;
+        activeAdminTab = parsed.adminTab || "inventario";
+        activeOpTab = parsed.opTab || "equipos";
+
+        if (currentUser.role === "operator") {
+            const freshOp = getOperatorByStation(currentUser.modulo, currentUser.estacion);
+            if (freshOp) currentUser.operator = freshOp;
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 // ==================== HELPERS DE ESTACIÓN (ESTACIÓN 0 = SERVIDOR) ====================
 function formatStationLabel(estacion, includeRoleHint = false) {
@@ -46,10 +87,11 @@ function formatStationLabel(estacion, includeRoleHint = false) {
 }
 
 function fillStationOptions(selectEl, modulo, options = {}) {
-    const { includeOperatorName = false, includeRoleHint = false, selectedValue = null } = options;
-    const count = Math.max(0, Number(appState.stations[modulo] ?? 0));
-    selectEl.innerHTML = "";
+    const { includeOperatorName = false, includeRoleHint = false, selectedValue = 0 } = options;
+    const rawCount = appState.stations[modulo];
+    const count = Math.max(0, Number(rawCount !== undefined && rawCount !== null ? rawCount : 0));
 
+    selectEl.innerHTML = "";
     for (let i = 0; i <= count; i++) {
         let label = formatStationLabel(i, includeRoleHint);
         if (includeOperatorName) {
@@ -62,8 +104,9 @@ function fillStationOptions(selectEl, modulo, options = {}) {
         selectEl.innerHTML += `<option value="${i}">${label}</option>`;
     }
 
-    if (selectedValue !== null && selectedValue !== undefined && Number(selectedValue) <= count) {
-        selectEl.value = String(selectedValue);
+    const numericSelected = Number(selectedValue);
+    if (!Number.isNaN(numericSelected) && numericSelected >= 0 && numericSelected <= count) {
+        selectEl.value = String(numericSelected);
     } else {
         selectEl.value = "0";
     }
@@ -76,9 +119,9 @@ function loadLocalCache() {
         if (raw) {
             const parsed = JSON.parse(raw);
             return {
-                stations: parsed.stations || DEFAULT_STATE.stations,
-                brands: parsed.brands || DEFAULT_STATE.brands,
-                types: parsed.types || DEFAULT_STATE.types,
+                stations: parsed.stations || { ...DEFAULT_STATE.stations },
+                brands: parsed.brands || [...DEFAULT_STATE.brands],
+                types: parsed.types || [...DEFAULT_STATE.types],
                 operators: parsed.operators || [],
                 components: parsed.components || [],
                 faults: parsed.faults || []
@@ -139,9 +182,9 @@ function initFirebaseRealtimeListener() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             appState = {
-                stations: data.stations || DEFAULT_STATE.stations,
-                brands: data.brands || DEFAULT_STATE.brands,
-                types: data.types || DEFAULT_STATE.types,
+                stations: data.stations || { ...DEFAULT_STATE.stations },
+                brands: data.brands || [...DEFAULT_STATE.brands],
+                types: data.types || [...DEFAULT_STATE.types],
                 operators: data.operators || [],
                 components: data.components || [],
                 faults: data.faults || []
@@ -161,14 +204,20 @@ function initFirebaseRealtimeListener() {
 function refreshActiveScreens() {
     if (!document.getElementById("loginScreen").classList.contains("d-none")) {
         const currentEst = document.getElementById("loginEstacion").value;
-        updateLoginStations(currentEst);
+        fillStationOptions(
+            document.getElementById("loginEstacion"),
+            document.getElementById("loginModulo").value,
+            { includeOperatorName: true, selectedValue: currentEst }
+        );
+        previewOperatorProfile();
     }
     if (currentUser) {
         if (currentUser.role === "admin") {
-            refreshAdminUI();
+            refreshAdminUI({ preserveSelection: true });
         } else {
             const updatedOp = getOperatorByStation(currentUser.modulo, currentUser.estacion);
             if (updatedOp) currentUser.operator = updatedOp;
+            persistSession();
             refreshOperatorUI();
         }
     }
@@ -176,7 +225,17 @@ function refreshActiveScreens() {
 
 // ==================== INICIALIZACIÓN ====================
 window.addEventListener("DOMContentLoaded", () => {
-    updateLoginStations();
+    fillStationOptions(
+        document.getElementById("loginEstacion"),
+        document.getElementById("loginModulo").value,
+        { includeOperatorName: true, selectedValue: 0 }
+    );
+    previewOperatorProfile();
+
+    if (restoreSession()) {
+        enterApp({ skipInitialReset: true });
+    }
+
     initFirebaseRealtimeListener();
 });
 
@@ -256,12 +315,11 @@ function switchLoginTab(role) {
     }
 }
 
-function updateLoginStations(selectedVal = null) {
+function onLoginModuloChange() {
     const modulo = document.getElementById("loginModulo").value;
-    const select = document.getElementById("loginEstacion");
-    fillStationOptions(select, modulo, {
+    fillStationOptions(document.getElementById("loginEstacion"), modulo, {
         includeOperatorName: true,
-        selectedValue: selectedVal ?? select.value
+        selectedValue: 0
     });
     previewOperatorProfile();
 }
@@ -302,6 +360,8 @@ function loginAsOperator(e) {
     }
 
     currentUser = { role: "operator", modulo, estacion, operator: op };
+    activeOpTab = "equipos";
+    persistSession();
     enterApp();
 }
 
@@ -313,11 +373,13 @@ function loginAsAdmin(e) {
         return;
     }
     currentUser = { role: "admin" };
+    activeAdminTab = "inventario";
     document.getElementById("adminPassword").value = "";
+    persistSession();
     enterApp();
 }
 
-function enterApp() {
+function enterApp({ skipInitialReset = false } = {}) {
     document.getElementById("loginScreen").classList.add("d-none");
     document.getElementById("mainApp").classList.remove("d-none");
 
@@ -325,25 +387,30 @@ function enterApp() {
         document.getElementById("adminView").classList.remove("d-none");
         document.getElementById("operatorView").classList.add("d-none");
         document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-shield-fill-check text-danger me-1"></i>Administrador Global`;
-        refreshAdminUI();
+        switchAdminTab(activeAdminTab);
+        refreshAdminUI({ preserveSelection: skipInitialReset });
     } else {
         document.getElementById("operatorView").classList.remove("d-none");
         document.getElementById("adminView").classList.add("d-none");
         const estText = Number(currentUser.estacion) === 0 ? "Estación 0 • Servidor" : `Estación ${currentUser.estacion}`;
         document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>Módulo ${currentUser.modulo} | ${estText}`;
+        switchOpTab(activeOpTab);
         refreshOperatorUI();
     }
 }
 
 function logout() {
     currentUser = null;
+    persistSession();
     document.getElementById("mainApp").classList.add("d-none");
     document.getElementById("loginScreen").classList.remove("d-none");
-    updateLoginStations();
+    onLoginModuloChange();
 }
 
 // ==================== LÓGICA VISTA DEL OPERADOR / RESPONSABLE ====================
 function switchOpTab(tab) {
+    activeOpTab = tab;
+    persistSession();
     document.getElementById("op-tab-equipos").classList.toggle("active", tab === "equipos");
     document.getElementById("op-tab-fallas").classList.toggle("active", tab === "fallas");
     document.getElementById("opSectionEquipos").classList.toggle("d-none", tab !== "equipos");
@@ -539,6 +606,8 @@ function refreshOperatorUI() {
 
 // ==================== LÓGICA VISTA ADMINISTRADOR ====================
 function switchAdminTab(tab) {
+    activeAdminTab = tab;
+    persistSession();
     const tabs = ["inventario", "operadores", "config", "fallas"];
     tabs.forEach(t => {
         document.getElementById(`adm-tab-${t}`).classList.toggle("active", t === tab);
@@ -546,7 +615,7 @@ function switchAdminTab(tab) {
     });
 }
 
-function refreshAdminUI() {
+function refreshAdminUI({ preserveSelection = false } = {}) {
     const activeFaults = appState.faults.filter(f => f.estatus !== "Finalizada");
     document.getElementById("adminStatTotal").textContent = appState.components.length;
     document.getElementById("adminStatOperators").textContent = appState.operators.length;
@@ -559,9 +628,22 @@ function refreshAdminUI() {
     document.getElementById("cfg-050353").value = appState.stations["050353"] ?? 0;
     document.getElementById("cfg-050354").value = appState.stations["050354"] ?? 0;
 
+    const compModVal = preserveSelection ? document.getElementById("compModulo").value : "050351";
+    const compEstVal = preserveSelection ? document.getElementById("compEstacion").value : 0;
+
+    const opModVal = preserveSelection ? document.getElementById("opRegModulo").value : "050351";
+    const opEstVal = preserveSelection ? document.getElementById("opRegEstacion").value : 0;
+
     populateDropdowns();
-    onAdminCompModuloChange();
-    updateOpRegStations();
+
+    document.getElementById("compModulo").value = compModVal;
+    fillStationOptions(document.getElementById("compEstacion"), compModVal, { selectedValue: compEstVal });
+    updateCompAssignedOperatorHint();
+
+    document.getElementById("opRegModulo").value = opModVal;
+    fillStationOptions(document.getElementById("opRegEstacion"), opModVal, { includeRoleHint: true, selectedValue: opEstVal });
+    updateOpRoleHint();
+
     renderAdminInventoryTable();
     renderOperatorsTable();
     renderCatalogs();
@@ -588,8 +670,7 @@ function populateDropdowns() {
 
 function onAdminCompModuloChange() {
     const modulo = document.getElementById("compModulo").value;
-    const estSel = document.getElementById("compEstacion");
-    fillStationOptions(estSel, modulo, { selectedValue: estSel.value });
+    fillStationOptions(document.getElementById("compEstacion"), modulo, { selectedValue: 0 });
     updateCompAssignedOperatorHint();
 }
 
@@ -653,8 +734,8 @@ async function saveComponent(e) {
     }
 
     await saveState();
-    resetComponentForm();
-    refreshAdminUI();
+    resetComponentForm({ keepModulo: modulo, keepEstacion: estacion });
+    refreshAdminUI({ preserveSelection: true });
 }
 
 function editComponent(id) {
@@ -684,20 +765,26 @@ function editComponent(id) {
     document.getElementById("btnCancelEditComp").classList.remove("d-none");
 }
 
-function resetComponentForm() {
+function resetComponentForm({ keepModulo = null, keepEstacion = null } = {}) {
+    const modToKeep = keepModulo ?? document.getElementById("compModulo").value;
+    const estToKeep = keepEstacion ?? 0;
+
     document.getElementById("componentForm").reset();
     document.getElementById("editCompId").value = "";
     clearImageField("compFotoInput", "compPhotoPreview", "currentCompPhoto");
     document.getElementById("compFormTitle").innerHTML = `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en Estación`;
     document.getElementById("btnCancelEditComp").classList.add("d-none");
-    onAdminCompModuloChange();
+
+    document.getElementById("compModulo").value = modToKeep;
+    fillStationOptions(document.getElementById("compEstacion"), modToKeep, { selectedValue: estToKeep });
+    updateCompAssignedOperatorHint();
 }
 
 async function deleteComponent(id) {
     if (!confirm("¿Seguro que deseas eliminar este componente del inventario?")) return;
     appState.components = appState.components.filter(c => c.id !== id);
     await saveState();
-    refreshAdminUI();
+    refreshAdminUI({ preserveSelection: true });
 }
 
 function renderAdminInventoryTable() {
@@ -759,13 +846,12 @@ function renderAdminInventoryTable() {
     }).join("");
 }
 
-// ==================== GESTIÓN DE OPERADORES Y RESPONSABLES (ADMIN) ====================
-function updateOpRegStations(selectedVal = null) {
+// ==================== GESTIÓN DE OPERADORES (MAC DISTRITO 03) ====================
+function onOpRegModuloChange() {
     const modulo = document.getElementById("opRegModulo").value;
-    const sel = document.getElementById("opRegEstacion");
-    fillStationOptions(sel, modulo, {
+    fillStationOptions(document.getElementById("opRegEstacion"), modulo, {
         includeRoleHint: true,
-        selectedValue: selectedVal ?? sel.value
+        selectedValue: 0
     });
     updateOpRoleHint();
 }
@@ -822,8 +908,8 @@ async function saveOperator(e) {
     }
 
     await saveState();
-    resetOperatorForm();
-    refreshAdminUI();
+    resetOperatorForm({ keepModulo: modulo, keepEstacion: estacion });
+    refreshAdminUI({ preserveSelection: true });
 }
 
 function editOperator(id) {
@@ -852,20 +938,29 @@ function editOperator(id) {
     document.getElementById("btnCancelEditOp").classList.remove("d-none");
 }
 
-function resetOperatorForm() {
+function resetOperatorForm({ keepModulo = null, keepEstacion = null } = {}) {
+    const modToKeep = keepModulo ?? document.getElementById("opRegModulo").value;
+    const estToKeep = keepEstacion ?? 0;
+
     document.getElementById("operatorForm").reset();
     document.getElementById("editOpId").value = "";
     clearImageField("opFotoInput", "opPhotoPreview", "currentOpPhoto");
     document.getElementById("opFormTitle").innerHTML = `<i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable`;
     document.getElementById("btnCancelEditOp").classList.add("d-none");
-    updateOpRegStations();
+
+    document.getElementById("opRegModulo").value = modToKeep;
+    fillStationOptions(document.getElementById("opRegEstacion"), modToKeep, {
+        includeRoleHint: true,
+        selectedValue: estToKeep
+    });
+    updateOpRoleHint();
 }
 
 async function deleteOperator(id) {
     if (!confirm("¿Eliminar este registro del sistema?")) return;
     appState.operators = appState.operators.filter(o => o.id !== id);
     await saveState();
-    refreshAdminUI();
+    refreshAdminUI({ preserveSelection: true });
 }
 
 function renderOperatorsTable() {
@@ -908,7 +1003,7 @@ async function saveStationCounts() {
     appState.stations["050353"] = Math.max(0, Number(document.getElementById("cfg-050353").value));
     appState.stations["050354"] = Math.max(0, Number(document.getElementById("cfg-050354").value));
     await saveState();
-    refreshAdminUI();
+    refreshAdminUI({ preserveSelection: true });
     alert("Estaciones actualizadas correctamente (la Estación 0 - Servidor permanece activa en los 3 módulos).");
 }
 
@@ -934,7 +1029,7 @@ async function addCatalogItem(key, inputId) {
     if (!appState[key].some(item => item.toLowerCase() === val.toLowerCase())) {
         appState[key].push(val);
         await saveState();
-        refreshAdminUI();
+        refreshAdminUI({ preserveSelection: true });
     }
     document.getElementById(inputId).value = "";
 }
@@ -946,7 +1041,7 @@ async function removeCatalogItem(key, idx) {
     }
     appState[key].splice(idx, 1);
     await saveState();
-    refreshAdminUI();
+    refreshAdminUI({ preserveSelection: true });
 }
 
 // ==================== REPORTES DE FALLA (INICIAL + SOLUCIÓN / FINALIZACIÓN) ====================
@@ -1005,7 +1100,7 @@ async function submitFaultReport(e) {
     await saveState();
 
     bootstrap.Modal.getInstance(document.getElementById("reportFaultModal")).hide();
-    if (currentUser.role === "admin") refreshAdminUI();
+    if (currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
     else refreshOperatorUI();
 
     openPrintFaultFormat(newFault.id, "initial");
@@ -1045,7 +1140,7 @@ async function submitResolveFault(e) {
     await saveState();
     bootstrap.Modal.getInstance(document.getElementById("resolveFaultModal")).hide();
 
-    if (currentUser.role === "admin") refreshAdminUI();
+    if (currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
     else refreshOperatorUI();
 
     openPrintFaultFormat(f.id, "solved");
@@ -1345,7 +1440,7 @@ function exportFaultsExcel() {
 // ==================== EXPOSICIÓN GLOBAL PARA EVENTOS HTML ====================
 Object.assign(window, {
     switchLoginTab,
-    updateLoginStations,
+    onLoginModuloChange,
     previewOperatorProfile,
     loginAsOperator,
     loginAsAdmin,
@@ -1362,7 +1457,7 @@ Object.assign(window, {
     resetComponentForm,
     deleteComponent,
     renderAdminInventoryTable,
-    updateOpRegStations,
+    onOpRegModuloChange,
     updateOpRoleHint,
     saveOperator,
     editOperator,
