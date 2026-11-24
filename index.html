@@ -48,24 +48,24 @@
                 <form id="operatorLoginForm" onsubmit="loginAsOperator(event)">
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Selecciona tu Módulo MAC</label>
-                        <select class="form-select form-select-lg" id="loginModulo" required onchange="onLoginModuloChange()">
+                        <select class="form-select" id="loginModulo" required onchange="onLoginModuloChange()">
                             <option value="050351">Módulo 050351</option>
                             <option value="050353">Módulo 050353</option>
                             <option value="050354">Módulo 050354</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Selecciona tu Estación de Trabajo (0 = Servidor)</label>
-                        <select class="form-select form-select-lg" id="loginEstacion" required onchange="previewOperatorProfile()"></select>
+                        <label class="form-label fw-semibold">Estación de Trabajo (0 = Servidor)</label>
+                        <select class="form-select" id="loginEstacion" required onchange="previewOperatorProfile()"></select>
                     </div>
 
                     <!-- Vista previa del operador / responsable registrado por el Admin -->
-                    <div id="operatorLoginPreview" class="alert alert-light border d-flex align-items-center gap-3 mb-4">
+                    <div id="operatorLoginPreview" class="alert alert-light border d-flex align-items-center gap-3 mb-4 py-2 px-3">
                         <img id="previewOpPhoto" src="" alt="Operador" class="avatar-operator">
-                        <div>
+                        <div class="min-w-0">
                             <div class="small text-muted">Responsable / Operador Asignado:</div>
-                            <div id="previewOpName" class="fw-bold text-dark">Sin responsable asignado</div>
-                            <div id="previewOpEmail" class="small text-secondary">Solicita al Administrador tu registro</div>
+                            <div id="previewOpName" class="fw-bold text-dark text-truncate">Sin responsable asignado</div>
+                            <div id="previewOpEmail" class="small text-secondary text-truncate">Solicita al Administrador tu registro</div>
                         </div>
                     </div>
 
@@ -137,9 +137,9 @@
                             </div>
                         </div>
                         <div class="col-md-auto text-md-end">
-                            <span class="badge bg-secondary-subtle text-secondary border px-3 py-2">
-                                <i class="bi bi-shield-check me-1"></i>Registro y Fallas de Estación (Sin Borrado)
-                            </span>
+                            <button type="button" class="btn btn-pink fw-semibold shadow-sm" onclick="openComponentModal('op')">
+                                <i class="bi bi-plus-circle-fill me-1"></i>Registrar Componente
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -148,7 +148,7 @@
                 <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm">
                     <li class="nav-item">
                         <button class="nav-link active" id="op-tab-equipos" onclick="switchOpTab('equipos')">
-                            <i class="bi bi-pc-display me-1"></i> Mis Componentes y Registro
+                            <i class="bi bi-pc-display me-1"></i> Mis Componentes
                         </button>
                     </li>
                     <li class="nav-item">
@@ -159,112 +159,23 @@
                     </li>
                 </ul>
 
-                <!-- Tab 1 Operador: Registrar y Ver Componentes de su Estación -->
+                <!-- Tab 1 Operador: Listado Agrupado de Componentes -->
                 <div id="opSectionEquipos">
-                    <div class="row g-4">
-                        <div class="col-lg-4">
-                            <div class="card card-custom p-3 p-md-4">
-                                <h5 class="fw-bold mb-3" id="opCompFormTitle">
-                                    <i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estación
-                                </h5>
-                                <form id="opComponentForm" onsubmit="saveOperatorComponent(event)">
-                                    <input type="hidden" id="opEditCompId" value="">
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Tipo de Componente *</label>
-                                        <select class="form-select" id="opCompTipo" required onchange="onBrandOrTypeChange('op')"></select>
-                                    </div>
-
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Marca *</label>
-                                            <select class="form-select" id="opCompMarca" required onchange="onBrandOrTypeChange('op')"></select>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Modelo *</label>
-                                            <input type="text" class="form-control" id="opCompModelo" placeholder="Ej. OptiPlex 7090" required>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Número de Serie / Código de Barras *</label>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control fw-bold" id="opCompSerie" placeholder="Escanea o escribe..." required>
-                                            <button class="btn btn-dark" type="button" id="btnOpScanSerie" onclick="openScanner('opCompSerie')">
-                                                <i class="bi bi-upc-scan me-1"></i>Escanear
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Inventario INE</label>
-                                        <input type="text" class="form-control" id="opCompInventarioIne" placeholder="Ej. INE-03-00452 (opcional)">
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Estado Físico</label>
-                                        <select class="form-select" id="opCompEstado">
-                                            <option value="Operativo">Operativo</option>
-                                            <option value="Stock">Stock</option>
-                                            <option value="En Falla">En Falla</option>
-                                            <option value="En Revisión">En Revisión</option>
-                                            <option value="No Aplica">No Aplica</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Fotografía del Componente</label>
-                                        <input type="file" class="form-control" id="opCompFotoInput" accept="image/*" capture="environment" onchange="previewImageFile(event, 'opCompPhotoPreview', 'opCompPhotoImg', 'currentOpCompPhoto')">
-                                        <div id="opCompPhotoPreview" class="mt-2 d-none text-center">
-                                            <img id="opCompPhotoImg" src="" alt="Vista previa" class="img-thumbnail" style="max-height: 120px;">
-                                            <button type="button" class="btn btn-sm btn-link text-danger d-block mx-auto" onclick="clearImageField('opCompFotoInput', 'opCompPhotoPreview', 'currentOpCompPhoto')">Quitar foto</button>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Observaciones</label>
-                                        <input type="text" class="form-control" id="opCompNotas" placeholder="Opcional: cables, detalles...">
-                                    </div>
-
-                                    <div class="d-grid gap-2">
-                                        <button type="submit" class="btn btn-pink">
-                                            <i class="bi bi-save me-1"></i>Guardar en mi Estación
-                                        </button>
-                                        <button type="button" id="btnOpCancelEditComp" class="btn btn-outline-secondary d-none" onclick="resetOpComponentForm()">
-                                            Cancelar Edición
-                                        </button>
-                                    </div>
-                                </form>
+                    <div class="card card-custom p-3 p-md-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                            <div>
+                                <h5 class="fw-bold mb-0"><i class="bi bi-hdd-rack me-2 text-danger"></i>Componentes de tu Estación por Grupo</h5>
+                                <small class="text-muted">Agrupados por tipo de componente. Puedes registrar, editar, eliminar o reportar fallas.</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-dark fs-6" id="opTotalComponents">0 equipos</span>
+                                <button type="button" class="btn btn-pink btn-sm fw-semibold" onclick="openComponentModal('op')">
+                                    <i class="bi bi-plus-lg me-1"></i>Nuevo
+                                </button>
                             </div>
                         </div>
 
-                        <div class="col-lg-8">
-                            <div class="card card-custom p-3 p-md-4">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                                    <div>
-                                        <h5 class="fw-bold mb-0"><i class="bi bi-hdd-rack me-2 text-danger"></i>Componentes de tu Estación</h5>
-                                        <small class="text-muted">Puedes registrar, editar y reportar fallas. El borrado definitivo corresponde al Administrador.</small>
-                                    </div>
-                                    <span class="badge bg-dark fs-6" id="opTotalComponents">0 equipos</span>
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Foto</th>
-                                                <th>Componente</th>
-                                                <th>Marca y Modelo</th>
-                                                <th>N° Serie / Inv. INE</th>
-                                                <th>Estado</th>
-                                                <th class="text-end">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="opComponentsTableBody"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
+                        <div id="opGroupedComponentsContainer"></div>
                     </div>
                 </div>
 
@@ -323,7 +234,7 @@
                 <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm flex-wrap">
                     <li class="nav-item">
                         <button class="nav-link active" id="adm-tab-inventario" onclick="switchAdminTab('inventario')">
-                            <i class="bi bi-pc-display me-1"></i> 1. Inventario y Registro de Equipos
+                            <i class="bi bi-pc-display me-1"></i> 1. Inventario por Grupos
                         </button>
                     </li>
                     <li class="nav-item">
@@ -344,161 +255,48 @@
                     </li>
                 </ul>
 
-                <!-- SECCIÓN ADMIN 1: INVENTARIO Y REGISTRO DE COMPONENTES -->
+                <!-- SECCIÓN ADMIN 1: INVENTARIO AGRUPADO DE COMPONENTES -->
                 <div id="admSectionInventario">
-                    <div class="row g-4">
-                        <div class="col-lg-4">
-                            <div class="card card-custom p-3 p-md-4">
-                                <h5 class="fw-bold mb-3" id="compFormTitle">
-                                    <i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en Estación
-                                </h5>
-                                <form id="componentForm" onsubmit="saveComponent(event)">
-                                    <input type="hidden" id="editCompId" value="">
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Módulo MAC *</label>
-                                            <select class="form-select" id="compModulo" required onchange="onAdminCompModuloChange()">
-                                                <option value="050351">050351</option>
-                                                <option value="050353">050353</option>
-                                                <option value="050354">050354</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Estación (0 = Servidor) *</label>
-                                            <select class="form-select" id="compEstacion" required onchange="onAdminStationOrBrandChange()"></select>
-                                        </div>
-                                    </div>
-
-                                    <div class="alert alert-light border py-2 px-3 mb-3 small">
-                                        <i class="bi bi-person-check-fill text-primary me-1"></i>
-                                        Asignado: <strong id="compOperatorHint">Sin asignar</strong>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Tipo de Componente *</label>
-                                        <select class="form-select" id="compTipo" required onchange="onBrandOrTypeChange('admin')"></select>
-                                    </div>
-
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Marca *</label>
-                                            <select class="form-select" id="compMarca" required onchange="onBrandOrTypeChange('admin')"></select>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Modelo *</label>
-                                            <input type="text" class="form-control" id="compModelo" placeholder="Ej. OptiPlex 7090" required>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Número de Serie / Código de Barras *</label>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control fw-bold" id="compSerie" placeholder="Escanea o escribe..." required>
-                                            <button class="btn btn-dark" type="button" id="btnAdmScanSerie" onclick="openScanner('compSerie')">
-                                                <i class="bi bi-upc-scan me-1"></i>Escanear
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Inventario INE</label>
-                                        <input type="text" class="form-control" id="compInventarioIne" placeholder="Ej. INE-03-00452 (opcional)">
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Estado Físico</label>
-                                        <select class="form-select" id="compEstado">
-                                            <option value="Operativo">Operativo</option>
-                                            <option value="Stock">Stock</option>
-                                            <option value="En Falla">En Falla</option>
-                                            <option value="En Revisión">En Revisión</option>
-                                            <option value="No Aplica">No Aplica</option>
-                                            <option value="Baja">Baja</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Fotografía del Componente</label>
-                                        <input type="file" class="form-control" id="compFotoInput" accept="image/*" capture="environment" onchange="previewImageFile(event, 'compPhotoPreview', 'compPhotoImg', 'currentCompPhoto')">
-                                        <div id="compPhotoPreview" class="mt-2 d-none text-center">
-                                            <img id="compPhotoImg" src="" alt="Vista previa" class="img-thumbnail" style="max-height: 120px;">
-                                            <button type="button" class="btn btn-sm btn-link text-danger d-block mx-auto" onclick="clearImageField('compFotoInput', 'compPhotoPreview', 'currentCompPhoto')">Quitar foto</button>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Observaciones</label>
-                                        <input type="text" class="form-control" id="compNotas" placeholder="Opcional: accesorios, detalles...">
-                                    </div>
-
-                                    <div class="d-grid gap-2">
-                                        <button type="submit" class="btn btn-pink">
-                                            <i class="bi bi-save me-1"></i>Guardar Componente
-                                        </button>
-                                        <button type="button" id="btnCancelEditComp" class="btn btn-outline-secondary d-none" onclick="resetComponentForm()">
-                                            Cancelar Edición
-                                        </button>
-                                    </div>
-                                </form>
+                    <div class="card card-custom p-3 p-md-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-collection text-danger me-2"></i>Inventario General Agrupado por Componente</h5>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-pink btn-sm fw-semibold shadow-sm" onclick="openComponentModal('admin')">
+                                    <i class="bi bi-plus-circle-fill me-1"></i>Registrar Componente
+                                </button>
+                                <button type="button" class="btn btn-outline-dark btn-sm fw-semibold" onclick="downloadImportTemplate()">
+                                    <i class="bi bi-download me-1"></i>Plantilla
+                                </button>
+                                <label class="btn btn-primary btn-sm fw-semibold mb-0 shadow-sm" style="cursor:pointer;">
+                                    <i class="bi bi-upload me-1"></i>Importar Excel / CSV
+                                    <input type="file" id="importExcelInput" accept=".xlsx,.xls,.csv" class="d-none" onchange="importInventoryExcel(event)">
+                                </label>
+                                <button type="button" class="btn btn-success btn-sm fw-semibold shadow-sm" onclick="exportInventoryExcel()">
+                                    <i class="bi bi-file-earmark-excel-fill me-1"></i>Exportar a Excel
+                                </button>
                             </div>
                         </div>
 
-                        <div class="col-lg-8">
-                            <div class="card card-custom p-3 p-md-4">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                                    <h5 class="fw-bold mb-0"><i class="bi bi-table text-danger me-2"></i>Inventario General por Módulo y Estación</h5>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button type="button" class="btn btn-outline-dark btn-sm fw-semibold" onclick="downloadImportTemplate()">
-                                            <i class="bi bi-download me-1"></i>Plantilla
-                                        </button>
-                                        <label class="btn btn-primary btn-sm fw-semibold mb-0 shadow-sm" style="cursor:pointer;">
-                                            <i class="bi bi-upload me-1"></i>Importar Excel / CSV
-                                            <input type="file" id="importExcelInput" accept=".xlsx,.xls,.csv" class="d-none" onchange="importInventoryExcel(event)">
-                                        </label>
-                                        <button type="button" class="btn btn-success btn-sm fw-semibold shadow-sm" onclick="exportInventoryExcel()">
-                                            <i class="bi bi-file-earmark-excel-fill me-1"></i>Exportar a Excel
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="row g-2 mb-3">
-                                    <div class="col-md-4">
-                                        <select class="form-select" id="adminFilterModulo" onchange="renderAdminInventoryTable()">
-                                            <option value="ALL">Todos los Módulos</option>
-                                            <option value="050351">Módulo 050351</option>
-                                            <option value="050353">Módulo 050353</option>
-                                            <option value="050354">Módulo 050354</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <select class="form-select" id="adminFilterTipo" onchange="renderAdminInventoryTable()">
-                                            <option value="ALL">Todos los Componentes</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <input type="text" class="form-control" id="adminSearchInput" placeholder="Buscar serie, Inv. INE, operador..." onkeyup="renderAdminInventoryTable()">
-                                    </div>
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Foto</th>
-                                                <th>Módulo / Estación</th>
-                                                <th>Operador / Resp.</th>
-                                                <th>Componente</th>
-                                                <th>Marca / Modelo</th>
-                                                <th>N° Serie / Inv. INE</th>
-                                                <th>Estado</th>
-                                                <th class="text-end">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="adminComponentsTableBody"></tbody>
-                                    </table>
-                                </div>
+                        <div class="row g-2 mb-4">
+                            <div class="col-md-4">
+                                <select class="form-select" id="adminFilterModulo" onchange="renderAdminInventoryGrouped()">
+                                    <option value="ALL">Todos los Módulos</option>
+                                    <option value="050351">Módulo 050351</option>
+                                    <option value="050353">Módulo 050353</option>
+                                    <option value="050354">Módulo 050354</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-select" id="adminFilterTipo" onchange="renderAdminInventoryGrouped()">
+                                    <option value="ALL">Todos los Componentes</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" id="adminSearchInput" placeholder="Buscar serie, Inv. INE, operador..." onkeyup="renderAdminInventoryGrouped()">
                             </div>
                         </div>
+
+                        <div id="adminGroupedComponentsContainer"></div>
                     </div>
                 </div>
 
@@ -682,6 +480,113 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- ================= MODAL FLOTANTE: REGISTRAR / EDITAR COMPONENTE ================= -->
+    <div class="modal fade" id="componentModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="compModalTitle">
+                        <i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="componentForm" onsubmit="saveComponentFromModal(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="editCompId" value="">
+                        <input type="hidden" id="compFormContext" value="admin">
+
+                        <div class="row g-3 mb-3" id="compAdminLocationRow">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Módulo MAC *</label>
+                                <select class="form-select" id="compModulo" onchange="onAdminCompModuloChange()">
+                                    <option value="050351">050351</option>
+                                    <option value="050353">050353</option>
+                                    <option value="050354">050354</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Estación (0 = Servidor) *</label>
+                                <select class="form-select" id="compEstacion" onchange="onAdminStationOrBrandChange()"></select>
+                            </div>
+                            <div class="col-12">
+                                <div class="alert alert-light border py-2 px-3 mb-0 small">
+                                    <i class="bi bi-person-check-fill text-primary me-1"></i>
+                                    Asignado: <strong id="compOperatorHint">Sin asignar</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Tipo de Componente *</label>
+                                <select class="form-select" id="compTipo" required onchange="onModalBrandOrTypeChange()"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Estado Físico</label>
+                                <select class="form-select" id="compEstado">
+                                    <option value="Operativo">Operativo</option>
+                                    <option value="Stock">Stock</option>
+                                    <option value="En Falla">En Falla</option>
+                                    <option value="En Revisión">En Revisión</option>
+                                    <option value="No Aplica">No Aplica</option>
+                                    <option value="Baja">Baja</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Marca *</label>
+                                <select class="form-select" id="compMarca" required onchange="onModalBrandOrTypeChange()"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Modelo *</label>
+                                <input type="text" class="form-control" id="compModelo" placeholder="Ej. OptiPlex 7090" required>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Número de Serie / Código de Barras *</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control fw-bold" id="compSerie" placeholder="Escanea o escribe..." required>
+                                    <button class="btn btn-dark" type="button" id="btnCompScanSerie" onclick="openScanner('compSerie')">
+                                        <i class="bi bi-upc-scan me-1"></i>Escanear
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Inventario INE</label>
+                                <input type="text" class="form-control" id="compInventarioIne" placeholder="Ej. INE-03-00452 (opcional)">
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Fotografía del Componente</label>
+                                <input type="file" class="form-control" id="compFotoInput" accept="image/*" capture="environment" onchange="previewImageFile(event, 'compPhotoPreview', 'compPhotoImg', 'currentCompPhoto')">
+                                <div id="compPhotoPreview" class="mt-2 d-none text-center">
+                                    <img id="compPhotoImg" src="" alt="Vista previa" class="img-thumbnail" style="max-height: 110px;">
+                                    <button type="button" class="btn btn-sm btn-link text-danger d-block mx-auto" onclick="clearImageField('compFotoInput', 'compPhotoPreview', 'currentCompPhoto')">Quitar foto</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Observaciones</label>
+                                <input type="text" class="form-control" id="compNotas" placeholder="Opcional: cables, accesorios, detalles...">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-pink fw-semibold">
+                            <i class="bi bi-save me-1"></i>Guardar Componente
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
