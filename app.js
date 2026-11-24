@@ -17,6 +17,7 @@ const DEFAULT_STATE = {
         "Cámara Fotográfica",
         "Pad de Firmas",
         "Escáner de Huellas",
+        "Decadactilar",
         "Impresora",
         "Escáner Digitalizador",
         "Lector QR / Código Barras",
@@ -38,6 +39,23 @@ let targetScannerInputId = null;
 let currentCompPhoto = "";
 let currentOpPhoto = "";
 let currentFaultPhoto = "";
+
+// ==================== ÍCONOS POR TIPO DE COMPONENTE ====================
+function getComponentIcon(tipo) {
+    const t = String(tipo || "").toLowerCase();
+    if (t.includes("laptop") || t.includes("portatil") || t.includes("portátil")) return "bi-laptop";
+    if (t.includes("servidor") || t.includes("rack")) return "bi-hdd-rack-fill";
+    if (t.includes("computadora") || t.includes("cpu") || t.includes("pc")) return "bi-pc-display";
+    if (t.includes("monitor") || t.includes("pantalla")) return "bi-display";
+    if (t.includes("camara") || t.includes("cámara") || t.includes("fotograf")) return "bi-camera-fill";
+    if (t.includes("firma") || t.includes("wacom") || t.includes("pad")) return "bi-pen-fill";
+    if (t.includes("huella") || t.includes("dactilar") || t.includes("decadactilar") || t.includes("biometr")) return "bi-fingerprint";
+    if (t.includes("impresora")) return "bi-printer-fill";
+    if (t.includes("qr") || t.includes("codigo") || t.includes("código") || t.includes("lector")) return "bi-upc-scan";
+    if (t.includes("escaner") || t.includes("escáner") || t.includes("digitalizador")) return "bi-file-earmark-ruled-fill";
+    if (t.includes("break") || t.includes("ups") || t.includes("energia") || t.includes("energía")) return "bi-battery-charging";
+    return "bi-cpu-fill";
+}
 
 // ==================== PERSISTENCIA DE SESIÓN AL REFRESCAR ====================
 function persistSession() {
@@ -77,7 +95,7 @@ function restoreSession() {
     }
 }
 
-// ==================== HELPERS DE ESTACIÓN (ESTACIÓN 0 = SERVIDOR) ====================
+// ==================== HELPERS DE ESTACIÓN Y USUARIOS ====================
 function formatStationLabel(estacion, includeRoleHint = false) {
     const num = Number(estacion);
     if (num === 0) {
@@ -86,26 +104,17 @@ function formatStationLabel(estacion, includeRoleHint = false) {
     return `Estación ${num}`;
 }
 
-function formatCompactPerson(name) {
-    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-    if (parts.length <= 2) return parts.join(" ");
-    return `${parts[0]} ${parts[1]}`;
-}
-
 function fillStationOptions(selectEl, modulo, options = {}) {
-    const { includeOperatorName = false, includeRoleHint = false, selectedValue = 0 } = options;
+    const { onlyUserName = false, includeRoleHint = false, selectedValue = 0 } = options;
     const rawCount = appState.stations[modulo];
     const count = Math.max(0, Number(rawCount !== undefined && rawCount !== null ? rawCount : 0));
 
     selectEl.innerHTML = "";
     for (let i = 0; i <= count; i++) {
-        const baseShort = i === 0 ? "Est. 0 (Servidor)" : `Est. ${i}`;
         let label = formatStationLabel(i, includeRoleHint);
-        if (includeOperatorName) {
+        if (onlyUserName) {
             const op = getOperatorByStation(modulo, i);
-            label = op
-                ? `${baseShort} • ${formatCompactPerson(op.nombre)}`
-                : `${baseShort} • Sin asignar`;
+            label = op ? op.nombre : "Sin asignar";
         }
         selectEl.innerHTML += `<option value="${i}">${label}</option>`;
     }
@@ -250,7 +259,7 @@ async function saveComponentFromModal(e) {
 
     const dup = appState.components.find(c => c.serie === serie && c.id !== editId);
     if (dup) {
-        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
+        alert(`El número de serie "${serie}" ya está registrado en ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
         return;
     }
 
@@ -290,7 +299,7 @@ async function saveComponentFromModal(e) {
     else refreshAdminUI({ preserveSelection: true });
 }
 
-// ==================== RENDERIZADO AGRUPADO POR COMPONENTE ====================
+// ==================== RENDERIZADO AGRUPADO POR COMPONENTE CON ÍCONOS ====================
 function groupComponentsByType(list) {
     const map = new Map();
     list.forEach(c => {
@@ -307,18 +316,21 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
     }
 
     const groups = groupComponentsByType(items);
-    return groups.map(([groupName, groupItems]) => `
+    return groups.map(([groupName, groupItems]) => {
+        const iconClass = getComponentIcon(groupName);
+        return `
         <div class="border rounded-3 mb-3 overflow-hidden bg-white">
             <div class="bg-light px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
-                <span class="fw-bold text-dark"><i class="bi bi-cpu text-danger me-2"></i>${groupName}</span>
+                <span class="fw-bold text-dark"><i class="bi ${iconClass} text-danger me-2"></i>${groupName}</span>
                 <span class="badge bg-secondary">${groupItems.length}</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light small">
+                    <thead class="table-light">
                         <tr>
                             <th>Foto</th>
-                            ${showLocation ? `<th>Módulo / Estación</th><th>Operador / Resp.</th>` : ""}
+                            <th>Componente</th>
+                            ${showLocation ? `<th>Módulo / Estación</th><th>Usuario / Resp.</th>` : ""}
                             <th>Marca y Modelo</th>
                             <th>N° Serie / Inv. INE</th>
                             <th>Estado</th>
@@ -330,6 +342,7 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                             const op = getOperatorByStation(c.modulo, c.estacion);
                             const isServer = Number(c.estacion) === 0;
                             const isNA = c.estado === "No Aplica" || c.marca === "NO APLICA";
+                            const itemIcon = getComponentIcon(c.tipo);
                             return `
                                 <tr>
                                     <td>
@@ -337,12 +350,15 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                             ? `<img src="${c.foto}" class="img-thumb" onclick="showPhotoModal('${c.foto}', '${c.tipo} - ${c.serie}')">`
                                             : `<span class="badge bg-light text-muted border">Sin foto</span>`}
                                     </td>
+                                    <td class="fw-bold">
+                                        <i class="bi ${itemIcon} text-danger me-1"></i>${c.tipo}
+                                    </td>
                                     ${showLocation ? `
                                         <td>
-                                            <span class="badge bg-dark">Mód. ${c.modulo}</span><br>
+                                            <span class="badge bg-dark">${c.modulo}</span><br>
                                             <small class="fw-bold ${isServer ? "text-primary" : ""}">${formatStationLabel(c.estacion)}</small>
                                         </td>
-                                        <td class="small">
+                                        <td>
                                             ${op
                                                 ? `<strong>${op.nombre}</strong>${isServer ? `<br><span class="badge bg-info-subtle text-dark border">Resp. Módulo</span>` : ""}`
                                                 : `<span class="text-danger">${isServer ? "Sin responsable" : "Sin asignar"}</span>`}
@@ -350,11 +366,11 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                     ` : ""}
                                     <td>
                                         <strong>${c.marca}</strong> <span class="text-muted">${c.modelo}</span>
-                                        ${c.notas ? `<div class="small text-muted">${c.notas}</div>` : ""}
+                                        ${c.notas ? `<div class="text-muted">${c.notas}</div>` : ""}
                                     </td>
                                     <td>
                                         <span class="font-monospace fw-bold bg-light px-2 py-1 rounded border">${c.serie}</span>
-                                        ${c.inventarioIne ? `<div class="small text-secondary mt-1">Inv. INE: <strong>${c.inventarioIne}</strong></div>` : ""}
+                                        ${c.inventarioIne ? `<div class="text-secondary mt-1">Inv. INE: <strong>${c.inventarioIne}</strong></div>` : ""}
                                     </td>
                                     <td>${getStatusBadge(c.estado)}</td>
                                     <td class="text-end">
@@ -366,8 +382,8 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                             ${!isNA ? `
-                                                <button class="btn btn-sm btn-outline-danger fw-semibold" onclick="openReportFaultModal('${c.id}')">
-                                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>Falla
+                                                <button class="btn btn-sm btn-outline-danger fw-semibold" title="Levantar Ticket de Servicio" onclick="openReportFaultModal('${c.id}')">
+                                                    <i class="bi bi-ticket-perforated-fill me-1"></i>Reportar Falla
                                                 </button>
                                             ` : ""}
                                         </div>
@@ -379,7 +395,7 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                 </table>
             </div>
         </div>
-    `).join("");
+    `}).join("");
 }
 
 function editComponentById(id) {
@@ -416,11 +432,11 @@ function updateCloudBadge(status) {
     if (status === "connected") {
         if (loginBadge) {
             loginBadge.className = "badge bg-success text-white";
-            loginBadge.innerHTML = `<i class="bi bi-cloud-check-fill me-1"></i>Firebase Conectado`;
+            loginBadge.innerHTML = `<i class="bi bi-cloud-fill me-1"></i>En Línea`;
         }
         if (appBadge) {
             appBadge.className = "badge bg-success text-white py-2 px-2";
-            appBadge.innerHTML = `<i class="bi bi-cloud-check-fill me-1"></i>Nube Conectada`;
+            appBadge.innerHTML = `<i class="bi bi-cloud-fill me-1"></i>En Línea`;
         }
     } else if (status === "saving") {
         if (appBadge) {
@@ -430,11 +446,11 @@ function updateCloudBadge(status) {
     } else {
         if (loginBadge) {
             loginBadge.className = "badge bg-warning text-dark";
-            loginBadge.innerHTML = `<i class="bi bi-wifi-off me-1"></i>Modo Respaldo Local`;
+            loginBadge.innerHTML = `<i class="bi bi-cloud-slash-fill me-1"></i>Sin Conexión`;
         }
         if (appBadge) {
             appBadge.className = "badge bg-warning text-dark py-2 px-2";
-            appBadge.innerHTML = `<i class="bi bi-wifi-off me-1"></i>Respaldo Local`;
+            appBadge.innerHTML = `<i class="bi bi-cloud-slash-fill me-1"></i>Sin Conexión`;
         }
     }
 }
@@ -484,7 +500,7 @@ function refreshActiveScreens() {
         fillStationOptions(
             document.getElementById("loginEstacion"),
             document.getElementById("loginModulo").value,
-            { includeOperatorName: true, selectedValue: currentEst }
+            { onlyUserName: true, selectedValue: currentEst }
         );
         previewOperatorProfile();
     }
@@ -505,7 +521,7 @@ window.addEventListener("DOMContentLoaded", () => {
     fillStationOptions(
         document.getElementById("loginEstacion"),
         document.getElementById("loginModulo").value,
-        { includeOperatorName: true, selectedValue: 0 }
+        { onlyUserName: true, selectedValue: 0 }
     );
     previewOperatorProfile();
 
@@ -595,7 +611,7 @@ function switchLoginTab(role) {
 function onLoginModuloChange() {
     const modulo = document.getElementById("loginModulo").value;
     fillStationOptions(document.getElementById("loginEstacion"), modulo, {
-        includeOperatorName: true,
+        onlyUserName: true,
         selectedValue: 0
     });
     previewOperatorProfile();
@@ -616,10 +632,8 @@ function previewOperatorProfile() {
         emailEl.textContent = `${op.correo} • Tel: ${op.telefono}`;
     } else {
         photoEl.src = DEFAULT_AVATAR;
-        nameEl.textContent = estacion === 0 ? "Estación 0 (Servidor) sin responsable asignado" : "Estación sin operador asignado";
-        emailEl.textContent = estacion === 0
-            ? "El Administrador debe registrar al Responsable de Módulo en Estación 0."
-            : "El Administrador debe registrar al operador de esta estación.";
+        nameEl.textContent = "Sin usuario asignado";
+        emailEl.textContent = "El Administrador debe registrar al responsable u operador.";
     }
 }
 
@@ -630,9 +644,7 @@ function loginAsOperator(e) {
     const op = getOperatorByStation(modulo, estacion);
 
     if (!op) {
-        alert(estacion === 0
-            ? "La Estación 0 (Servidor) aún no tiene un Responsable de Módulo registrado."
-            : "Esta estación aún no tiene un operador registrado. Solicita al Administrador que te dé de alta en el sistema.");
+        alert("Este usuario aún no está registrado. Solicita al Administrador que te dé de alta en el sistema.");
         return;
     }
 
@@ -670,7 +682,7 @@ function enterApp({ skipInitialReset = false } = {}) {
         document.getElementById("operatorView").classList.remove("d-none");
         document.getElementById("adminView").classList.add("d-none");
         const estText = Number(currentUser.estacion) === 0 ? "Estación 0 • Servidor" : `Estación ${currentUser.estacion}`;
-        document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>Módulo ${currentUser.modulo} | ${estText}`;
+        document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>${currentUser.modulo} | ${estText}`;
         switchOpTab(activeOpTab);
         refreshOperatorUI();
     }
@@ -697,7 +709,7 @@ function switchOpTab(tab) {
 function refreshOperatorUI() {
     const { modulo, estacion, operator } = currentUser;
     document.getElementById("opCardPhoto").src = operator.foto || DEFAULT_AVATAR;
-    document.getElementById("opCardModulo").textContent = `Módulo ${modulo}`;
+    document.getElementById("opCardModulo").textContent = modulo;
     document.getElementById("opCardEstacion").textContent = Number(estacion) === 0 ? "Estación 0 • Servidor" : `Estación ${estacion}`;
     document.getElementById("opCardName").textContent = operator.nombre;
     document.getElementById("opCardPhone").textContent = operator.telefono;
@@ -713,36 +725,37 @@ function refreshOperatorUI() {
 
     const fbody = document.getElementById("opFaultsTableBody");
     if (myFaults.length === 0) {
-        fbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No has generado reportes de falla en esta estación.</td></tr>`;
+        fbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No has generado tickets de servicio en esta estación.</td></tr>`;
     } else {
         fbody.innerHTML = myFaults.slice().reverse().map(f => {
             const isSolved = f.estatus === "Finalizada";
+            const compIcon = getComponentIcon(f.compTipo);
             return `
             <tr>
-                <td class="fw-bold text-danger font-monospace">${f.folio}</td>
-                <td class="small">${f.fecha}</td>
-                <td><strong>${f.compTipo}</strong><br><small class="font-monospace text-muted">${f.compSerie}</small></td>
-                <td class="small"><strong>${f.categoria}:</strong> ${f.descripcion}</td>
+                <td class="fw-bold text-danger font-monospace"><i class="bi bi-ticket-perforated-fill me-1"></i>${f.folio}</td>
+                <td>${f.fecha}</td>
+                <td><strong><i class="bi ${compIcon} text-danger me-1"></i>${f.compTipo}</strong><br><small class="font-monospace text-muted">${f.compSerie}</small></td>
+                <td><strong>${f.categoria}:</strong> ${f.descripcion}</td>
                 <td>
                     ${isSolved
-                        ? `<span class="badge bg-success">Finalizada / Arreglada</span><div class="small text-muted mt-1">${f.fechaSolucion || ''}</div>`
+                        ? `<span class="badge bg-success">Finalizada / Arreglada</span><div class="text-muted mt-1">${f.fechaSolucion || ''}</div>`
                         : `<span class="badge bg-warning text-dark">${f.estatus}</span>`}
                 </td>
                 <td class="text-end">
                     <div class="d-flex justify-content-end gap-1 flex-wrap">
                         ${!isSolved ? `
-                            <button class="btn btn-sm btn-success" title="Registrar solución" onclick="openResolveFaultModal('${f.id}')">
-                                <i class="bi bi-check2-circle me-1"></i>Finalizar Falla
+                            <button class="btn btn-sm btn-success" title="Registrar seguimiento o solución" onclick="openResolveFaultModal('${f.id}')">
+                                <i class="bi bi-check2-circle me-1"></i>Seguimiento / Cerrar
                             </button>
                             <button class="btn btn-sm btn-dark" onclick="openPrintFaultFormat('${f.id}', 'initial')">
-                                <i class="bi bi-printer me-1"></i>Formato Falla
+                                <i class="bi bi-printer me-1"></i>Hoja de Servicio
                             </button>
                         ` : `
-                            <button class="btn btn-sm btn-outline-secondary" title="Formato inicial" onclick="openPrintFaultFormat('${f.id}', 'initial')">
+                            <button class="btn btn-sm btn-outline-secondary" title="Hoja de servicio inicial" onclick="openPrintFaultFormat('${f.id}', 'initial')">
                                 <i class="bi bi-file-earmark-text"></i> Inicial
                             </button>
-                            <button class="btn btn-sm btn-success" title="Formato de falla finalizada" onclick="openPrintFaultFormat('${f.id}', 'solved')">
-                                <i class="bi bi-printer-fill me-1"></i>Reporte Finalizado
+                            <button class="btn btn-sm btn-success" title="Hoja de servicio finalizada" onclick="openPrintFaultFormat('${f.id}', 'solved')">
+                                <i class="bi bi-printer-fill me-1"></i>Hoja Finalizada
                             </button>
                         `}
                     </div>
@@ -771,6 +784,19 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
     document.getElementById("adminStatStations").textContent = totalStations;
     document.getElementById("adminStatFaults").textContent = activeFaults.length;
     document.getElementById("admFaultBadge").textContent = activeFaults.length;
+
+    // Alerta visual de tickets de servicio pendientes para el Administrador
+    const alertBar = document.getElementById("adminTicketAlertBar");
+    if (alertBar) {
+        if (activeFaults.length > 0) {
+            document.getElementById("adminTicketAlertCount").textContent = activeFaults.length;
+            alertBar.classList.remove("d-none");
+            alertBar.classList.add("d-flex");
+        } else {
+            alertBar.classList.add("d-none");
+            alertBar.classList.remove("d-flex");
+        }
+    }
 
     document.getElementById("cfg-050351").value = appState.stations["050351"] ?? 0;
     document.getElementById("cfg-050353").value = appState.stations["050353"] ?? 0;
@@ -890,7 +916,7 @@ async function saveOperator(e) {
     const existingStationOp = appState.operators.find(o => o.modulo === modulo && Number(o.estacion) === estacion && o.id !== editId);
     if (existingStationOp) {
         const estText = formatStationLabel(estacion);
-        if (!confirm(`${estText} del Módulo ${modulo} ya tiene asignado a ${existingStationOp.nombre}. ¿Deseas reemplazarlo?`)) {
+        if (!confirm(`${estText} del ${modulo} ya tiene asignado a ${existingStationOp.nombre}. ¿Deseas reemplazarlo?`)) {
             return;
         }
         appState.operators = appState.operators.filter(o => o.id !== existingStationOp.id);
@@ -991,12 +1017,12 @@ function renderOperatorsTable() {
         <tr>
             <td><img src="${o.foto || DEFAULT_AVATAR}" class="avatar-table" onclick="showPhotoModal('${o.foto || DEFAULT_AVATAR}', '${o.nombre}')"></td>
             <td>
-                <span class="badge bg-dark">Mód. ${o.modulo}</span>
+                <span class="badge bg-dark">${o.modulo}</span>
                 <span class="badge ${isServer ? "bg-primary" : "btn-pink"}">${isServer ? "Est. 0 • Servidor" : `Est. ${o.estacion}`}</span>
             </td>
             <td class="fw-bold">${o.nombre}${isServer ? `<br><small class="text-primary">Responsable de Módulo</small>` : ""}</td>
-            <td class="small">${o.telefono}</td>
-            <td class="small text-primary">${o.correo}</td>
+            <td>${o.telefono}</td>
+            <td class="text-primary">${o.correo}</td>
             <td class="text-end">
                 <div class="btn-group btn-group-sm">
                     <button class="btn btn-outline-primary" onclick="editOperator('${o.id}')"><i class="bi bi-pencil"></i></button>
@@ -1014,7 +1040,7 @@ async function saveStationCounts() {
     appState.stations["050354"] = Math.max(0, Number(document.getElementById("cfg-050354").value));
     await saveState();
     refreshAdminUI({ preserveSelection: true });
-    alert("Estaciones actualizadas correctamente (la Estación 0 - Servidor permanece activa en los 3 módulos).");
+    alert("Estaciones actualizadas correctamente.");
 }
 
 function renderCatalogs() {
@@ -1027,6 +1053,7 @@ function renderCatalogs() {
 
     document.getElementById("typesListContainer").innerHTML = appState.types.map((t, idx) => `
         <span class="badge bg-light text-dark border p-2 d-inline-flex align-items-center gap-2">
+            <i class="bi ${getComponentIcon(t)} text-danger"></i>
             ${t}
             <i class="bi bi-x-circle-fill text-danger" style="cursor:pointer" onclick="removeCatalogItem('types', ${idx})"></i>
         </span>
@@ -1054,7 +1081,7 @@ async function removeCatalogItem(key, idx) {
     refreshAdminUI({ preserveSelection: true });
 }
 
-// ==================== REPORTES DE FALLA (INICIAL + SOLUCIÓN / FINALIZACIÓN) ====================
+// ==================== TICKETS DE SERVICIO Y REPORTES DE FALLA ====================
 function openReportFaultModal(compId) {
     const comp = appState.components.find(c => c.id === compId);
     if (!comp) return;
@@ -1063,7 +1090,7 @@ function openReportFaultModal(compId) {
     document.getElementById("faultCompId").value = comp.id;
     document.getElementById("faultCompInfo").textContent = `${comp.tipo} — ${comp.marca} ${comp.modelo}`;
     document.getElementById("faultCompSerie").textContent = comp.serie;
-    document.getElementById("faultLocationInfo").textContent = `Módulo ${comp.modulo} | ${formatStationLabel(comp.estacion)} (${op ? op.nombre : "Sin asignar"})`;
+    document.getElementById("faultLocationInfo").textContent = `${comp.modulo} | ${formatStationLabel(comp.estacion)} (${op ? op.nombre : "Sin asignar"})`;
 
     document.getElementById("faultForm").reset();
     clearImageField("faultPhotoInput", "faultPhotoPreview", "currentFaultPhoto");
@@ -1079,7 +1106,7 @@ async function submitFaultReport(e) {
     const op = getOperatorByStation(comp.modulo, comp.estacion);
     const consecutive = String(appState.faults.length + 1).padStart(3, "0");
     const year = new Date().getFullYear();
-    const folio = `FALLA-${comp.modulo}-${year}-${consecutive}`;
+    const folio = `TKT-${comp.modulo}-${year}-${consecutive}`;
 
     const newFault = {
         id: "FLT-" + Date.now(),
@@ -1098,7 +1125,7 @@ async function submitFaultReport(e) {
         categoria: document.getElementById("faultCategory").value,
         descripcion: document.getElementById("faultDescription").value.trim(),
         foto: currentFaultPhoto,
-        estatus: "Pendiente de Atención",
+        estatus: "Ticket Abierto / Pendiente",
         fechaSolucion: "",
         tecnicoSolucion: "",
         tipoSolucion: "",
@@ -1113,6 +1140,7 @@ async function submitFaultReport(e) {
     if (currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
     else refreshOperatorUI();
 
+    alert(`Ticket de Servicio generado: ${folio}\nSe ha notificado al Administrador y se abrirá la Hoja de Servicio para firmas.`);
     openPrintFaultFormat(newFault.id, "initial");
 }
 
@@ -1125,6 +1153,7 @@ function openResolveFaultModal(faultId) {
     document.getElementById("resolveCompInfo").textContent = `${f.compTipo} (${f.compMarca} ${f.compModelo} - Serie: ${f.compSerie})`;
     document.getElementById("resolveOriginalDesc").textContent = `${f.categoria}: ${f.descripcion}`;
     document.getElementById("resolveFaultForm").reset();
+    document.getElementById("resolveStatusSelect").value = "Finalizada";
     document.getElementById("resolveRestoreComponent").checked = true;
 
     new bootstrap.Modal(document.getElementById("resolveFaultModal")).show();
@@ -1136,13 +1165,14 @@ async function submitResolveFault(e) {
     const f = appState.faults.find(item => item.id === faultId);
     if (!f) return;
 
-    f.estatus = "Finalizada";
+    const newStatus = document.getElementById("resolveStatusSelect").value;
+    f.estatus = newStatus;
     f.fechaSolucion = new Date().toLocaleString("es-MX");
     f.tecnicoSolucion = document.getElementById("resolveTechnician").value.trim();
     f.tipoSolucion = document.getElementById("resolveActionType").value;
     f.notasSolucion = document.getElementById("resolveNotes").value.trim();
 
-    if (document.getElementById("resolveRestoreComponent").checked) {
+    if (newStatus === "Finalizada" && document.getElementById("resolveRestoreComponent").checked) {
         const comp = appState.components.find(c => c.id === f.compId);
         if (comp) comp.estado = "Operativo";
     }
@@ -1153,44 +1183,48 @@ async function submitResolveFault(e) {
     if (currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
     else refreshOperatorUI();
 
-    openPrintFaultFormat(f.id, "solved");
+    openPrintFaultFormat(f.id, newStatus === "Finalizada" ? "solved" : "initial");
 }
 
 function renderAdminFaultsTable() {
     const tbody = document.getElementById("adminFaultsTableBody");
     if (appState.faults.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No hay reportes de falla registrados.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No hay tickets de servicio ni reportes de falla registrados.</td></tr>`;
         return;
     }
     tbody.innerHTML = appState.faults.slice().reverse().map(f => {
         const isSolved = f.estatus === "Finalizada";
+        const compIcon = getComponentIcon(f.compTipo);
         return `
         <tr>
-            <td class="fw-bold text-danger font-monospace">${f.folio}<br><small class="text-muted fw-normal">${f.fecha}</small></td>
-            <td><span class="badge bg-dark">Mód. ${f.modulo}</span><br><small>${formatStationLabel(f.estacion)}</small></td>
-            <td class="small"><strong>${f.operadorNombre}</strong><br><span class="text-muted">${f.operadorTelefono}</span></td>
-            <td><strong>${f.compTipo}</strong><br><small class="font-monospace">${f.compSerie}</small></td>
-            <td class="small"><strong>${f.categoria}:</strong> ${f.descripcion}</td>
+            <td class="fw-bold text-danger font-monospace">
+                <i class="bi bi-ticket-perforated-fill me-1"></i>${f.folio}
+                <br><small class="text-muted fw-normal">${f.fecha}</small>
+            </td>
+            <td><span class="badge bg-dark">${f.modulo}</span><br><small>${formatStationLabel(f.estacion)}</small></td>
+            <td><strong>${f.operadorNombre}</strong><br><span class="text-muted">${f.operadorTelefono}</span></td>
+            <td><strong><i class="bi ${compIcon} text-danger me-1"></i>${f.compTipo}</strong><br><small class="font-monospace">${f.compSerie}</small></td>
+            <td><strong>${f.categoria}:</strong> ${f.descripcion}</td>
             <td>
                 ${isSolved
-                    ? `<span class="badge bg-success">Finalizada / Arreglada</span><div class="small text-muted mt-1">Atendió: ${f.tecnicoSolucion}</div>`
-                    : `<span class="badge bg-warning text-dark">${f.estatus}</span>`}
+                    ? `<span class="badge bg-success">Finalizada / Arreglada</span><div class="text-muted mt-1">Atendió: ${f.tecnicoSolucion}</div>`
+                    : `<span class="badge bg-warning text-dark">${f.estatus}</span>${f.tecnicoSolucion ? `<div class="text-muted mt-1">Seguimiento: ${f.tecnicoSolucion}</div>` : ""}`}
             </td>
             <td class="text-end">
                 <div class="d-flex justify-content-end gap-1 flex-wrap">
                     ${!isSolved ? `
-                        <button class="btn btn-sm btn-success fw-semibold" title="Dar solución y finalizar" onclick="openResolveFaultModal('${f.id}')">
-                            <i class="bi bi-check2-circle me-1"></i>Resolver
+                        <button class="btn btn-sm btn-success fw-semibold" title="Dar seguimiento o finalizar ticket" onclick="openResolveFaultModal('${f.id}')">
+                            <i class="bi bi-check2-circle me-1"></i>Seguimiento / Resolver
                         </button>
                         <button class="btn btn-sm btn-dark" onclick="openPrintFaultFormat('${f.id}', 'initial')">
-                            <i class="bi bi-printer"></i> Formato
+                            <i class="bi bi-printer me-1"></i>Hoja Servicio
                         </button>
                     ` : `
-                        <button class="btn btn-sm btn-outline-secondary" title="Ver formato inicial" onclick="openPrintFaultFormat('${f.id}', 'initial')">
+                        <button class="btn btn-sm btn-outline-secondary" title="Hoja de servicio inicial" onclick="openPrintFaultFormat('${f.id}', 'initial')">
                             <i class="bi bi-file-earmark-text"></i> Inicial
                         </button>
-                        <button class="btn btn-sm btn-success fw-semibold" title="Imprimir formato de falla finalizada" onclick="openPrintFaultFormat('${f.id}', 'solved')">
-                            <i class="bi bi-printer-fill me-1"></i>Finalizado
+                        <button class="btn btn-sm btn-success fw-semibold" title="Imprimir hoja de servicio finalizada" onclick="openPrintFaultFormat('${f.id}', 'solved')">
+                            <i class="bi bi-printer-fill me-1"></i>Hoja Finalizada
                         </button>
                     `}
                 </div>
@@ -1205,19 +1239,19 @@ function openPrintFaultFormat(faultId, mode = "initial") {
 
     const isSolvedMode = mode === "solved" && f.estatus === "Finalizada";
     document.getElementById("printModalHeaderTitle").innerHTML = isSolvedMode
-        ? `<i class="bi bi-file-earmark-check-fill text-success me-2"></i>Formato de Falla Finalizada / Arreglada`
-        : `<i class="bi bi-printer me-2"></i>Formato Oficial de Reporte de Falla`;
+        ? `<i class="bi bi-file-earmark-check-fill text-success me-2"></i>Hoja de Servicio Finalizada`
+        : `<i class="bi bi-printer me-2"></i>Hoja de Servicio — Ticket ${f.folio}`;
 
     const headerTitle = isSolvedMode
-        ? "DICTAMEN Y REPORTE DE FALLA FINALIZADA / ARREGLADA"
-        : "REPORTE DE FALLA EN EQUIPAMIENTO DIGITAL";
+        ? "HOJA DE SERVICIO Y DICTAMEN DE FALLA FINALIZADA"
+        : "HOJA DE SERVICIO — REPORTE DE FALLA Y TICKET DE ATENCIÓN";
 
     const solvedBlockHtml = isSolvedMode ? `
         <div class="print-box" style="border-color: #065f46;">
-            <div class="print-box-title-solved">4. Dictamen Técnico de Solución y Cierre de Falla</div>
+            <div class="print-box-title-solved">4. Dictamen Técnico de Solución y Cierre de Ticket</div>
             <div class="row mb-1">
-                <div class="col-6"><strong>Fecha y Hora de Solución:</strong> ${f.fechaSolucion}</div>
-                <div class="col-6"><strong>Estatus Final:</strong> <span style="color:#065f46; font-weight:bold;">OPERATIVO / FALLA FINALIZADA</span></div>
+                <div class="col-6"><strong>Fecha y Hora de Cierre:</strong> ${f.fechaSolucion}</div>
+                <div class="col-6"><strong>Estatus Final:</strong> <span style="color:#065f46; font-weight:bold;">OPERATIVO / TICKET CERRADO</span></div>
             </div>
             <div class="row mb-2">
                 <div class="col-6"><strong>Técnico / Responsable:</strong> ${f.tecnicoSolucion}</div>
@@ -1233,19 +1267,19 @@ function openPrintFaultFormat(faultId, mode = "initial") {
             <div class="col-4">
                 <div style="border-top: 1px solid #000; margin: 0 10px; padding-top: 4px;">
                     <strong>${f.operadorNombre}</strong><br>
-                    <small>${Number(f.estacion) === 0 ? "Responsable de Módulo" : "Operador MAC"} (Recibe de Conformidad)</small>
+                    <small>${Number(f.estacion) === 0 ? "Responsable de Módulo" : "Usuario MAC"} (Firma de Conformidad)</small>
                 </div>
             </div>
             <div class="col-4">
                 <div style="border-top: 1px solid #000; margin: 0 10px; padding-top: 4px;">
                     <strong>${f.tecnicoSolucion}</strong><br>
-                    <small>Técnico / Responsable de Solución</small>
+                    <small>Técnico / Responsable de Servicio</small>
                 </div>
             </div>
             <div class="col-4">
                 <div style="border-top: 1px solid #000; margin: 0 10px; padding-top: 4px;">
                     <strong>Vo. Bo. Responsable de Módulo / RFE</strong><br>
-                    <small>Validación de Cierre</small>
+                    <small>Firma de Validación</small>
                 </div>
             </div>
         </div>
@@ -1254,13 +1288,13 @@ function openPrintFaultFormat(faultId, mode = "initial") {
             <div class="col-6">
                 <div style="border-top: 1px solid #000; margin: 0 25px; padding-top: 5px;">
                     <strong>${f.operadorNombre}</strong><br>
-                    <small>Firma (${Number(f.estacion) === 0 ? "Responsable de Módulo" : "Operador del Módulo MAC"})</small>
+                    <small>Firma (${Number(f.estacion) === 0 ? "Responsable de Módulo" : "Usuario MAC"})</small>
                 </div>
             </div>
             <div class="col-6">
                 <div style="border-top: 1px solid #000; margin: 0 25px; padding-top: 5px;">
-                    <strong>Responsable de Módulo / Soporte Técnico</strong><br>
-                    <small>Nombre y Firma de Recepción</small>
+                    <strong>Administrador / Soporte Técnico</strong><br>
+                    <small>Nombre y Firma de Recepción de Servicio</small>
                 </div>
             </div>
         </div>
@@ -1269,30 +1303,30 @@ function openPrintFaultFormat(faultId, mode = "initial") {
     const printHtml = `
         <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-2 mb-3">
             <div>
-                <h5 class="fw-bold mb-0">MÓDULOS DE ATENCIÓN CIUDADANA (MAC)</h5>
+                <h5 class="fw-bold mb-0">MÓDULOS DE ATENCIÓN CIUDADANA (050351 • 050353 • 050354)</h5>
                 <div class="fw-semibold" style="color: ${isSolvedMode ? '#065f46' : '#D5007F'};">${headerTitle}</div>
             </div>
             <div class="text-end">
-                <div class="fw-bold fs-6 text-danger">${f.folio}</div>
-                <div class="small">Emisión: ${f.fecha}</div>
+                <div class="fw-bold text-danger">TICKET: ${f.folio}</div>
+                <div>Emisión: ${f.fecha}</div>
             </div>
         </div>
 
         <div class="print-box">
-            <div class="print-box-title">1. Datos de Ubicación y Operador Responsable</div>
+            <div class="print-box-title">1. Datos de Ubicación y Usuario Responsable</div>
             <div class="row">
-                <div class="col-6"><strong>Módulo MAC:</strong> ${f.modulo}</div>
+                <div class="col-6"><strong>Módulo:</strong> ${f.modulo}</div>
                 <div class="col-6"><strong>Estación de Trabajo:</strong> ${formatStationLabel(f.estacion)}</div>
-                <div class="col-12 mt-1"><strong>Nombre:</strong> ${f.operadorNombre}</div>
+                <div class="col-12 mt-1"><strong>Usuario:</strong> ${f.operadorNombre}</div>
                 <div class="col-6 mt-1"><strong>Teléfono:</strong> ${f.operadorTelefono}</div>
                 <div class="col-6 mt-1"><strong>Correo Institucional:</strong> ${f.operadorCorreo}</div>
             </div>
         </div>
 
         <div class="print-box">
-            <div class="print-box-title">2. Identificación del Componente Afectado</div>
+            <div class="print-box-title">2. Identificación del Equipo Tecnológico</div>
             <div class="row">
-                <div class="col-6"><strong>Tipo de Componente:</strong> ${f.compTipo}</div>
+                <div class="col-6"><strong>Componente:</strong> ${f.compTipo}</div>
                 <div class="col-6"><strong>Marca / Modelo:</strong> ${f.compMarca} ${f.compModelo}</div>
                 <div class="col-12 mt-1"><strong>Número de Serie / Inventario:</strong> <span class="font-monospace fw-bold">${f.compSerie}</span></div>
             </div>
@@ -1309,8 +1343,8 @@ function openPrintFaultFormat(faultId, mode = "initial") {
         ${solvedBlockHtml}
         ${signaturesHtml}
 
-        <div class="text-muted text-center mt-3" style="font-size: 10px;">
-            Formato temporal generado por Sistema de Control de Componentes MAC • Módulos 050351, 050353 y 050354
+        <div class="text-muted text-center mt-3">
+            Hoja de Servicio Oficial • Registro de Equipo Tecnológico • CarRivers Design
         </div>
     `;
 
@@ -1365,7 +1399,7 @@ function downloadImportTemplate() {
             "Serie": "J101CBVA",
             "InventarioINE": "",
             "Estado": "Operativo",
-            "Notas": "Servidor Módulo 050351"
+            "Notas": "Servidor 050351"
         },
         {
             "Modulo": "050351",
@@ -1522,9 +1556,9 @@ function exportInventoryExcel() {
         const op = getOperatorByStation(c.modulo, c.estacion);
         return {
             "#": idx + 1,
-            "Módulo MAC": c.modulo,
+            "Módulo": c.modulo,
             "Estación": formatStationLabel(c.estacion),
-            "Operador / Responsable": op ? op.nombre : "Sin asignar",
+            "Usuario / Responsable": op ? op.nombre : "Sin asignar",
             "Teléfono": op ? op.telefono : "",
             "Correo Institucional": op ? op.correo : "",
             "Tipo de Componente": c.tipo,
@@ -1568,17 +1602,17 @@ function exportInventoryExcel() {
 
 function exportFaultsExcel() {
     if (appState.faults.length === 0) {
-        alert("No hay reportes de falla para exportar.");
+        alert("No hay tickets ni reportes de falla para exportar.");
         return;
     }
 
     const rows = appState.faults.map((f, i) => ({
         "#": i + 1,
-        "Folio": f.folio,
+        "Ticket / Folio": f.folio,
         "Fecha Reporte": f.fecha,
         "Módulo": f.modulo,
         "Estación": formatStationLabel(f.estacion),
-        "Operador / Responsable": f.operadorNombre,
+        "Usuario / Responsable": f.operadorNombre,
         "Teléfono": f.operadorTelefono,
         "Correo": f.operadorCorreo,
         "Componente": f.compTipo,
@@ -1587,23 +1621,23 @@ function exportFaultsExcel() {
         "Tipo Falla": f.categoria,
         "Descripción Falla": f.descripcion,
         "Estatus": f.estatus,
-        "Fecha Solución": f.fechaSolucion || "Pendiente",
+        "Fecha Seguimiento / Cierre": f.fechaSolucion || "Pendiente",
         "Técnico Responsable": f.tecnicoSolucion || "",
-        "Tipo Solución": f.tipoSolucion || "",
-        "Trabajos Realizados": f.notasSolucion || ""
+        "Tipo Atención": f.tipoSolucion || "",
+        "Notas de Seguimiento": f.notasSolucion || ""
     }));
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-        { wch: 5 }, { wch: 20 }, { wch: 18 }, { wch: 10 }, { wch: 22 },
+        { wch: 5 }, { wch: 22 }, { wch: 18 }, { wch: 10 }, { wch: 22 },
         { wch: 26 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 20 },
-        { wch: 20 }, { wch: 22 }, { wch: 35 }, { wch: 18 }, { wch: 18 },
+        { wch: 20 }, { wch: 22 }, { wch: 35 }, { wch: 22 }, { wch: 18 },
         { wch: 24 }, { wch: 24 }, { wch: 35 }
     ];
-    XLSX.utils.book_append_sheet(wb, ws, "Bitácora de Fallas");
+    XLSX.utils.book_append_sheet(wb, ws, "Tickets_y_Fallas");
     const fecha = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `Bitacora_Fallas_MACs_${fecha}.xlsx`);
+    XLSX.writeFile(wb, `Tickets_Fallas_MACs_${fecha}.xlsx`);
 }
 
 // ==================== EXPOSICIÓN GLOBAL PARA EVENTOS HTML ====================
