@@ -34,7 +34,7 @@
                 <ul class="nav nav-pills nav-fill mb-4 bg-light p-1 rounded-3" id="loginRoleTabs">
                     <li class="nav-item">
                         <button class="nav-link active" id="tab-op-login" type="button" onclick="switchLoginTab('operator')">
-                            <i class="bi bi-person-badge me-1"></i> Soy Operador / Resp.
+                            <i class="bi bi-person-badge me-1"></i> Personal MACs
                         </button>
                     </li>
                     <li class="nav-item">
@@ -47,7 +47,7 @@
                 <!-- Formulario Acceso Operador / Responsable de Módulo -->
                 <form id="operatorLoginForm" onsubmit="loginAsOperator(event)">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Selecciona tu Módulo MAC</label>
+                        <label class="form-label fw-semibold">Selecciona tu Módulo</label>
                         <select class="form-select" id="loginModulo" required onchange="onLoginModuloChange()">
                             <option value="050351">Módulo 050351</option>
                             <option value="050353">Módulo 050353</option>
@@ -55,7 +55,7 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Estación de Trabajo (0 = Servidor)</label>
+                        <label class="form-label fw-semibold">Usuario</label>
                         <select class="form-select" id="loginEstacion" required onchange="previewOperatorProfile()"></select>
                     </div>
 
@@ -81,7 +81,7 @@
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Contraseña de Administrador</label>
-                        <input type="password" class="form-control form-control-lg" id="adminPassword" placeholder="Ingresa clave (admin123)" required>
+                        <input type="password" class="form-control form-control-lg" id="adminPassword" placeholder="Ingresa clave" required>
                     </div>
                     <button type="submit" class="btn btn-dark btn-lg w-100 shadow-sm">
                         <i class="bi bi-unlock-fill me-2"></i>Entrar como Administrador
