@@ -8,7 +8,7 @@ const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/20
 
 const DEFAULT_STATE = {
     stations: { "050351": 4, "050353": 3, "050354": 3 },
-    brands: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Logitech", "Topaz", "Crossmatch", "Suprema", "Brother", "Genérico"],
+    brands: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Logitech", "Topaz", "Crossmatch", "Suprema", "Brother", "NO APLICA", "Genérico"],
     types: [
         "Computadora / CPU",
         "Monitor",
@@ -110,6 +110,61 @@ function fillStationOptions(selectEl, modulo, options = {}) {
     } else {
         selectEl.value = "0";
     }
+}
+
+// ==================== APAGADO / ACTIVACIÓN DE CAMPOS AL ELEGIR "NO APLICA" ====================
+function applyBrandLockState(mode) {
+    const isAdmin = mode === "admin";
+    const marca = document.getElementById(isAdmin ? "compMarca" : "opCompMarca").value;
+    const isNoAplica = marca === "NO APLICA";
+
+    const modeloEl = document.getElementById(isAdmin ? "compModelo" : "opCompModelo");
+    const serieEl = document.getElementById(isAdmin ? "compSerie" : "opCompSerie");
+    const invIneEl = document.getElementById(isAdmin ? "compInventarioIne" : "opCompInventarioIne");
+    const estadoEl = document.getElementById(isAdmin ? "compEstado" : "opCompEstado");
+    const scanBtnEl = document.getElementById(isAdmin ? "btnAdmScanSerie" : "btnOpScanSerie");
+
+    modeloEl.disabled = isNoAplica;
+    serieEl.disabled = isNoAplica;
+    invIneEl.disabled = isNoAplica;
+    if (scanBtnEl) scanBtnEl.disabled = isNoAplica;
+
+    if (isNoAplica) {
+        const modulo = isAdmin ? document.getElementById("compModulo").value : currentUser.modulo;
+        const estacion = isAdmin ? Number(document.getElementById("compEstacion").value) : Number(currentUser.estacion);
+        const tipo = document.getElementById(isAdmin ? "compTipo" : "opCompTipo").value;
+        const editId = document.getElementById(isAdmin ? "editCompId" : "opEditCompId").value;
+
+        modeloEl.value = "NO APLICA";
+        invIneEl.value = "NO APLICA";
+        estadoEl.value = "No Aplica";
+
+        const tag = tipo
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^A-Za-z0-9]/g, "")
+            .toUpperCase()
+            .slice(0, 12);
+
+        let serieCandidate = `NA-${modulo}-E${estacion}-${tag}`;
+        if (appState.components.some(c => c.serie === serieCandidate && c.id !== editId)) {
+            serieCandidate = `${serieCandidate}-${Date.now().toString().slice(-3)}`;
+        }
+        serieEl.value = serieCandidate;
+    } else {
+        if (modeloEl.value === "NO APLICA") modeloEl.value = "";
+        if (invIneEl.value === "NO APLICA") invIneEl.value = "";
+        if (serieEl.value.startsWith("NA-")) serieEl.value = "";
+        if (estadoEl.value === "No Aplica") estadoEl.value = "Operativo";
+    }
+}
+
+function onBrandOrTypeChange(mode) {
+    applyBrandLockState(mode);
+}
+
+function onAdminStationOrBrandChange() {
+    updateCompAssignedOperatorHint();
+    applyBrandLockState("admin");
 }
 
 // ==================== SINCRONIZACIÓN FIRESTORE EN TIEMPO REAL ====================
@@ -290,8 +345,10 @@ function showPhotoModal(src, title) {
 
 function getStatusBadge(status) {
     if (status === "Operativo") return `<span class="badge bg-success-subtle text-success border border-success-subtle">Operativo</span>`;
+    if (status === "Stock") return `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Stock</span>`;
     if (status === "En Falla") return `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">En Falla</span>`;
     if (status === "En Revisión") return `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">En Revisión</span>`;
+    if (status === "No Aplica") return `<span class="badge bg-light text-secondary border">No Aplica</span>`;
     return `<span class="badge bg-secondary-subtle text-secondary border">Baja</span>`;
 }
 
@@ -420,8 +477,9 @@ function switchOpTab(tab) {
 function populateOperatorFormDropdowns() {
     const brandSel = document.getElementById("opCompMarca");
     const currBrand = brandSel.value;
-    brandSel.innerHTML = appState.brands.map(b => `<option value="${b}">${b}</option>`).join("");
-    if (currBrand && appState.brands.includes(currBrand)) brandSel.value = currBrand;
+    const brandsList = appState.brands.includes("NO APLICA") ? appState.brands : ["NO APLICA", ...appState.brands];
+    brandSel.innerHTML = brandsList.map(b => `<option value="${b}">${b}</option>`).join("");
+    if (currBrand && brandsList.includes(currBrand)) brandSel.value = currBrand;
 
     const typeSel = document.getElementById("opCompTipo");
     const currType = typeSel.value;
@@ -440,6 +498,7 @@ async function saveOperatorComponent(e) {
     const marca = document.getElementById("opCompMarca").value;
     const modelo = document.getElementById("opCompModelo").value.trim();
     const serie = document.getElementById("opCompSerie").value.trim().toUpperCase();
+    const inventarioIne = document.getElementById("opCompInventarioIne").value.trim().toUpperCase();
     const estado = document.getElementById("opCompEstado").value;
     const notas = document.getElementById("opCompNotas").value.trim();
 
@@ -454,7 +513,7 @@ async function saveOperatorComponent(e) {
         if (idx !== -1) {
             appState.components[idx] = {
                 ...appState.components[idx],
-                tipo, marca, modelo, serie, estado, notas,
+                tipo, marca, modelo, serie, inventarioIne, estado, notas,
                 foto: currentOpCompPhoto || appState.components[idx].foto,
                 registradoPor: currentUser.operator.nombre
             };
@@ -468,6 +527,7 @@ async function saveOperatorComponent(e) {
             marca,
             modelo,
             serie,
+            inventarioIne,
             estado,
             notas,
             foto: currentOpCompPhoto,
@@ -489,9 +549,14 @@ function editOperatorComponent(id) {
     populateOperatorFormDropdowns();
     document.getElementById("opEditCompId").value = c.id;
     document.getElementById("opCompTipo").value = c.tipo;
-    document.getElementById("opCompMarca").value = c.marca;
+    const opMarcaSel = document.getElementById("opCompMarca");
+    if (![...opMarcaSel.options].some(o => o.value === c.marca)) {
+        opMarcaSel.innerHTML = `<option value="${c.marca}">${c.marca}</option>` + opMarcaSel.innerHTML;
+    }
+    opMarcaSel.value = c.marca;
     document.getElementById("opCompModelo").value = c.modelo;
     document.getElementById("opCompSerie").value = c.serie;
+    document.getElementById("opCompInventarioIne").value = c.inventarioIne || "";
     document.getElementById("opCompEstado").value = c.estado === "Baja" ? "En Revisión" : c.estado;
     document.getElementById("opCompNotas").value = c.notas || "";
 
@@ -503,7 +568,8 @@ function editOperatorComponent(id) {
         document.getElementById("opCompPhotoPreview").classList.add("d-none");
     }
 
-    document.getElementById("opCompFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente de mi Estación`;
+    applyBrandLockState("op");
+    document.getElementById("opCompFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente`;
     document.getElementById("btnOpCancelEditComp").classList.remove("d-none");
 }
 
@@ -514,6 +580,7 @@ function resetOpComponentForm() {
     document.getElementById("opCompFormTitle").innerHTML = `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estación`;
     document.getElementById("btnOpCancelEditComp").classList.add("d-none");
     populateOperatorFormDropdowns();
+    applyBrandLockState("op");
 }
 
 function refreshOperatorUI() {
@@ -526,6 +593,7 @@ function refreshOperatorUI() {
     document.getElementById("opCardEmail").textContent = operator.correo;
 
     populateOperatorFormDropdowns();
+    applyBrandLockState("op");
 
     const myComps = appState.components.filter(c => c.modulo === modulo && Number(c.estacion) === Number(estacion));
     document.getElementById("opTotalComponents").textContent = `${myComps.length} equipos`;
@@ -534,7 +602,9 @@ function refreshOperatorUI() {
     if (myComps.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Aún no has registrado componentes en esta estación. Usa el formulario para agregarlos.</td></tr>`;
     } else {
-        tbody.innerHTML = myComps.map(c => `
+        tbody.innerHTML = myComps.map(c => {
+            const isNA = c.estado === "No Aplica" || c.marca === "NO APLICA";
+            return `
             <tr>
                 <td>
                     ${c.foto
@@ -543,20 +613,25 @@ function refreshOperatorUI() {
                 </td>
                 <td class="fw-bold">${c.tipo}</td>
                 <td>${c.marca} <span class="text-muted">${c.modelo}</span></td>
-                <td><span class="font-monospace fw-semibold bg-light px-2 py-1 rounded border">${c.serie}</span></td>
+                <td>
+                    <span class="font-monospace fw-semibold bg-light px-2 py-1 rounded border">${c.serie}</span>
+                    ${c.inventarioIne ? `<div class="small text-secondary mt-1">Inv. INE: <strong>${c.inventarioIne}</strong></div>` : ""}
+                </td>
                 <td>${getStatusBadge(c.estado)}</td>
                 <td class="text-end">
                     <div class="d-flex justify-content-end gap-1 flex-wrap">
                         <button class="btn btn-sm btn-outline-primary" title="Editar componente" onclick="editOperatorComponent('${c.id}')">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger fw-semibold" onclick="openReportFaultModal('${c.id}')">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Reportar Falla
-                        </button>
+                        ${!isNA ? `
+                            <button class="btn btn-sm btn-outline-danger fw-semibold" onclick="openReportFaultModal('${c.id}')">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>Reportar Falla
+                            </button>
+                        ` : ""}
                     </div>
                 </td>
             </tr>
-        `).join("");
+        `}).join("");
     }
 
     const myFaults = appState.faults.filter(f => f.modulo === modulo && Number(f.estacion) === Number(estacion));
@@ -639,6 +714,7 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
     document.getElementById("compModulo").value = compModVal;
     fillStationOptions(document.getElementById("compEstacion"), compModVal, { selectedValue: compEstVal });
     updateCompAssignedOperatorHint();
+    applyBrandLockState("admin");
 
     document.getElementById("opRegModulo").value = opModVal;
     fillStationOptions(document.getElementById("opRegEstacion"), opModVal, { includeRoleHint: true, selectedValue: opEstVal });
@@ -653,8 +729,9 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
 function populateDropdowns() {
     const brandSel = document.getElementById("compMarca");
     const currBrand = brandSel.value;
-    brandSel.innerHTML = appState.brands.map(b => `<option value="${b}">${b}</option>`).join("");
-    if (currBrand && appState.brands.includes(currBrand)) brandSel.value = currBrand;
+    const brandsList = appState.brands.includes("NO APLICA") ? appState.brands : ["NO APLICA", ...appState.brands];
+    brandSel.innerHTML = brandsList.map(b => `<option value="${b}">${b}</option>`).join("");
+    if (currBrand && brandsList.includes(currBrand)) brandSel.value = currBrand;
 
     const typeSel = document.getElementById("compTipo");
     const currType = typeSel.value;
@@ -672,6 +749,7 @@ function onAdminCompModuloChange() {
     const modulo = document.getElementById("compModulo").value;
     fillStationOptions(document.getElementById("compEstacion"), modulo, { selectedValue: 0 });
     updateCompAssignedOperatorHint();
+    applyBrandLockState("admin");
 }
 
 function updateCompAssignedOperatorHint() {
@@ -698,6 +776,7 @@ async function saveComponent(e) {
     const marca = document.getElementById("compMarca").value;
     const modelo = document.getElementById("compModelo").value.trim();
     const serie = document.getElementById("compSerie").value.trim().toUpperCase();
+    const inventarioIne = document.getElementById("compInventarioIne").value.trim().toUpperCase();
     const estado = document.getElementById("compEstado").value;
     const notas = document.getElementById("compNotas").value.trim();
 
@@ -712,7 +791,7 @@ async function saveComponent(e) {
         if (idx !== -1) {
             appState.components[idx] = {
                 ...appState.components[idx],
-                modulo, estacion, tipo, marca, modelo, serie, estado, notas,
+                modulo, estacion, tipo, marca, modelo, serie, inventarioIne, estado, notas,
                 foto: currentCompPhoto || appState.components[idx].foto
             };
         }
@@ -725,6 +804,7 @@ async function saveComponent(e) {
             marca,
             modelo,
             serie,
+            inventarioIne,
             estado,
             notas,
             foto: currentCompPhoto,
@@ -747,9 +827,16 @@ function editComponent(id) {
     fillStationOptions(document.getElementById("compEstacion"), c.modulo, { selectedValue: c.estacion });
     updateCompAssignedOperatorHint();
     document.getElementById("compTipo").value = c.tipo;
-    document.getElementById("compMarca").value = c.marca;
+
+    const marcaSel = document.getElementById("compMarca");
+    if (![...marcaSel.options].some(o => o.value === c.marca)) {
+        marcaSel.innerHTML = `<option value="${c.marca}">${c.marca}</option>` + marcaSel.innerHTML;
+    }
+    marcaSel.value = c.marca;
+
     document.getElementById("compModelo").value = c.modelo;
     document.getElementById("compSerie").value = c.serie;
+    document.getElementById("compInventarioIne").value = c.inventarioIne || "";
     document.getElementById("compEstado").value = c.estado;
     document.getElementById("compNotas").value = c.notas || "";
 
@@ -761,6 +848,7 @@ function editComponent(id) {
         document.getElementById("compPhotoPreview").classList.add("d-none");
     }
 
+    applyBrandLockState("admin");
     document.getElementById("compFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente`;
     document.getElementById("btnCancelEditComp").classList.remove("d-none");
 }
@@ -778,6 +866,7 @@ function resetComponentForm({ keepModulo = null, keepEstacion = null } = {}) {
     document.getElementById("compModulo").value = modToKeep;
     fillStationOptions(document.getElementById("compEstacion"), modToKeep, { selectedValue: estToKeep });
     updateCompAssignedOperatorHint();
+    applyBrandLockState("admin");
 }
 
 async function deleteComponent(id) {
@@ -799,7 +888,7 @@ function renderAdminInventoryTable() {
             const op = getOperatorByStation(c.modulo, c.estacion);
             const opName = op ? op.nombre.toLowerCase() : "";
             const estText = formatStationLabel(c.estacion).toLowerCase();
-            const haystack = `${c.serie} ${c.marca} ${c.modelo} ${c.tipo} ${opName} ${estText}`.toLowerCase();
+            const haystack = `${c.serie} ${c.inventarioIne || ""} ${c.marca} ${c.modelo} ${c.tipo} ${c.estado} ${opName} ${estText}`.toLowerCase();
             if (!haystack.includes(search)) return false;
         }
         return true;
@@ -814,6 +903,7 @@ function renderAdminInventoryTable() {
     tbody.innerHTML = filtered.map(c => {
         const op = getOperatorByStation(c.modulo, c.estacion);
         const isServer = Number(c.estacion) === 0;
+        const isNA = c.estado === "No Aplica" || c.marca === "NO APLICA";
         return `
             <tr>
                 <td>
@@ -832,11 +922,14 @@ function renderAdminInventoryTable() {
                 </td>
                 <td class="fw-semibold">${c.tipo}</td>
                 <td>${c.marca} <span class="text-muted">${c.modelo}</span></td>
-                <td><span class="font-monospace fw-bold">${c.serie}</span></td>
+                <td>
+                    <span class="font-monospace fw-bold">${c.serie}</span>
+                    ${c.inventarioIne ? `<div class="small text-secondary">Inv. INE: <strong>${c.inventarioIne}</strong></div>` : ""}
+                </td>
                 <td>${getStatusBadge(c.estado)}</td>
                 <td class="text-end">
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-danger" title="Levantar Falla" onclick="openReportFaultModal('${c.id}')"><i class="bi bi-exclamation-triangle"></i></button>
+                        ${!isNA ? `<button class="btn btn-outline-danger" title="Levantar Falla" onclick="openReportFaultModal('${c.id}')"><i class="bi bi-exclamation-triangle"></i></button>` : ""}
                         <button class="btn btn-outline-primary" title="Editar" onclick="editComponent('${c.id}')"><i class="bi bi-pencil"></i></button>
                         <button class="btn btn-outline-secondary" title="Eliminar" onclick="deleteComponent('${c.id}')"><i class="bi bi-trash"></i></button>
                     </div>
@@ -1363,6 +1456,7 @@ function exportInventoryExcel() {
             "Marca": c.marca,
             "Modelo": c.modelo,
             "Número de Serie": c.serie,
+            "Inventario INE": c.inventarioIne || "",
             "Estado": c.estado,
             "Registrado Por": c.registradoPor || "Administrador",
             "Observaciones": c.notas || "",
@@ -1375,7 +1469,7 @@ function exportInventoryExcel() {
     ws["!cols"] = [
         { wch: 5 }, { wch: 12 }, { wch: 22 }, { wch: 28 }, { wch: 16 },
         { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 22 },
-        { wch: 14 }, { wch: 22 }, { wch: 25 }, { wch: 20 }
+        { wch: 20 }, { wch: 14 }, { wch: 22 }, { wch: 25 }, { wch: 20 }
     ];
     XLSX.utils.book_append_sheet(wb, ws, "Inventario Componentes");
 
@@ -1446,11 +1540,13 @@ Object.assign(window, {
     loginAsAdmin,
     logout,
     switchOpTab,
+    onBrandOrTypeChange,
     saveOperatorComponent,
     editOperatorComponent,
     resetOpComponentForm,
     switchAdminTab,
     onAdminCompModuloChange,
+    onAdminStationOrBrandChange,
     updateCompAssignedOperatorHint,
     saveComponent,
     editComponent,
