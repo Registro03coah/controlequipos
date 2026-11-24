@@ -17,7 +17,8 @@ const DEFAULT_STATE = {
         "Pad de Firmas",
         "Cámara Fotográfica",
         "Lector QR / Código Barras",
-        "No-Break / UPS"
+        "No-Break / UPS",
+        "Servidor"
     ],
     operators: [],
     components: [],
@@ -34,6 +35,39 @@ let currentCompPhoto = "";
 let currentOpCompPhoto = "";
 let currentOpPhoto = "";
 let currentFaultPhoto = "";
+
+// ==================== HELPERS DE ESTACIÓN (ESTACIÓN 0 = SERVIDOR) ====================
+function formatStationLabel(estacion, includeRoleHint = false) {
+    const num = Number(estacion);
+    if (num === 0) {
+        return includeRoleHint ? "Estación 0 — Servidor (Responsable de Módulo)" : "Estación 0 (Servidor)";
+    }
+    return `Estación ${num}`;
+}
+
+function fillStationOptions(selectEl, modulo, options = {}) {
+    const { includeOperatorName = false, includeRoleHint = false, selectedValue = null } = options;
+    const count = Math.max(0, Number(appState.stations[modulo] ?? 0));
+    selectEl.innerHTML = "";
+
+    for (let i = 0; i <= count; i++) {
+        let label = formatStationLabel(i, includeRoleHint);
+        if (includeOperatorName) {
+            const op = getOperatorByStation(modulo, i);
+            const roleWord = i === 0 ? "responsable" : "operador";
+            label = op
+                ? `${formatStationLabel(i)} — ${op.nombre}`
+                : `${formatStationLabel(i)} (Sin ${roleWord} asignado)`;
+        }
+        selectEl.innerHTML += `<option value="${i}">${label}</option>`;
+    }
+
+    if (selectedValue !== null && selectedValue !== undefined && Number(selectedValue) <= count) {
+        selectEl.value = String(selectedValue);
+    } else {
+        selectEl.value = "0";
+    }
+}
 
 // ==================== SINCRONIZACIÓN FIRESTORE EN TIEMPO REAL ====================
 function loadLocalCache() {
@@ -127,14 +161,7 @@ function initFirebaseRealtimeListener() {
 function refreshActiveScreens() {
     if (!document.getElementById("loginScreen").classList.contains("d-none")) {
         const currentEst = document.getElementById("loginEstacion").value;
-        updateLoginStations();
-        if (currentEst) {
-            const sel = document.getElementById("loginEstacion");
-            if ([...sel.options].some(o => o.value === currentEst)) {
-                sel.value = currentEst;
-                previewOperatorProfile();
-            }
-        }
+        updateLoginStations(currentEst);
     }
     if (currentUser) {
         if (currentUser.role === "admin") {
@@ -229,16 +256,13 @@ function switchLoginTab(role) {
     }
 }
 
-function updateLoginStations() {
+function updateLoginStations(selectedVal = null) {
     const modulo = document.getElementById("loginModulo").value;
-    const count = appState.stations[modulo] || 1;
     const select = document.getElementById("loginEstacion");
-    select.innerHTML = "";
-    for (let i = 1; i <= count; i++) {
-        const op = getOperatorByStation(modulo, i);
-        const label = op ? `Estación ${i} — ${op.nombre}` : `Estación ${i} (Sin operador asignado)`;
-        select.innerHTML += `<option value="${i}">${label}</option>`;
-    }
+    fillStationOptions(select, modulo, {
+        includeOperatorName: true,
+        selectedValue: selectedVal ?? select.value
+    });
     previewOperatorProfile();
 }
 
@@ -257,8 +281,10 @@ function previewOperatorProfile() {
         emailEl.textContent = `${op.correo} • Tel: ${op.telefono}`;
     } else {
         photoEl.src = DEFAULT_AVATAR;
-        nameEl.textContent = "Estación sin operador asignado";
-        emailEl.textContent = "El Administrador debe registrar al operador de esta estación.";
+        nameEl.textContent = estacion === 0 ? "Estación 0 (Servidor) sin responsable asignado" : "Estación sin operador asignado";
+        emailEl.textContent = estacion === 0
+            ? "El Administrador debe registrar al Responsable de Módulo en Estación 0."
+            : "El Administrador debe registrar al operador de esta estación.";
     }
 }
 
@@ -269,7 +295,9 @@ function loginAsOperator(e) {
     const op = getOperatorByStation(modulo, estacion);
 
     if (!op) {
-        alert("Esta estación aún no tiene un operador registrado. Solicita al Administrador que te dé de alta en el sistema.");
+        alert(estacion === 0
+            ? "La Estación 0 (Servidor) aún no tiene un Responsable de Módulo registrado."
+            : "Esta estación aún no tiene un operador registrado. Solicita al Administrador que te dé de alta en el sistema.");
         return;
     }
 
@@ -301,7 +329,8 @@ function enterApp() {
     } else {
         document.getElementById("operatorView").classList.remove("d-none");
         document.getElementById("adminView").classList.add("d-none");
-        document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>Módulo ${currentUser.modulo} | Estación ${currentUser.estacion}`;
+        const estText = Number(currentUser.estacion) === 0 ? "Estación 0 • Servidor" : `Estación ${currentUser.estacion}`;
+        document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>Módulo ${currentUser.modulo} | ${estText}`;
         refreshOperatorUI();
     }
 }
@@ -313,7 +342,7 @@ function logout() {
     updateLoginStations();
 }
 
-// ==================== LÓGICA VISTA DEL OPERADOR ====================
+// ==================== LÓGICA VISTA DEL OPERADOR / RESPONSABLE ====================
 function switchOpTab(tab) {
     document.getElementById("op-tab-equipos").classList.toggle("active", tab === "equipos");
     document.getElementById("op-tab-fallas").classList.toggle("active", tab === "fallas");
@@ -349,7 +378,7 @@ async function saveOperatorComponent(e) {
 
     const dup = appState.components.find(c => c.serie === serie && c.id !== editId);
     if (dup) {
-        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - Estación ${dup.estacion}.`);
+        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
         return;
     }
 
@@ -424,14 +453,14 @@ function refreshOperatorUI() {
     const { modulo, estacion, operator } = currentUser;
     document.getElementById("opCardPhoto").src = operator.foto || DEFAULT_AVATAR;
     document.getElementById("opCardModulo").textContent = `Módulo ${modulo}`;
-    document.getElementById("opCardEstacion").textContent = `Estación ${estacion}`;
+    document.getElementById("opCardEstacion").textContent = Number(estacion) === 0 ? "Estación 0 • Servidor" : `Estación ${estacion}`;
     document.getElementById("opCardName").textContent = operator.nombre;
     document.getElementById("opCardPhone").textContent = operator.telefono;
     document.getElementById("opCardEmail").textContent = operator.correo;
 
     populateOperatorFormDropdowns();
 
-    const myComps = appState.components.filter(c => c.modulo === modulo && Number(c.estacion) === estacion);
+    const myComps = appState.components.filter(c => c.modulo === modulo && Number(c.estacion) === Number(estacion));
     document.getElementById("opTotalComponents").textContent = `${myComps.length} equipos`;
 
     const tbody = document.getElementById("opComponentsTableBody");
@@ -463,7 +492,7 @@ function refreshOperatorUI() {
         `).join("");
     }
 
-    const myFaults = appState.faults.filter(f => f.modulo === modulo && Number(f.estacion) === estacion);
+    const myFaults = appState.faults.filter(f => f.modulo === modulo && Number(f.estacion) === Number(estacion));
     const activeMyFaults = myFaults.filter(f => f.estatus !== "Finalizada");
     document.getElementById("opFaultCountBadge").textContent = activeMyFaults.length;
 
@@ -521,14 +550,14 @@ function refreshAdminUI() {
     const activeFaults = appState.faults.filter(f => f.estatus !== "Finalizada");
     document.getElementById("adminStatTotal").textContent = appState.components.length;
     document.getElementById("adminStatOperators").textContent = appState.operators.length;
-    const totalStations = Object.values(appState.stations).reduce((a, b) => a + Number(b), 0);
+    const totalStations = Object.values(appState.stations).reduce((a, b) => a + 1 + Math.max(0, Number(b)), 0);
     document.getElementById("adminStatStations").textContent = totalStations;
     document.getElementById("adminStatFaults").textContent = activeFaults.length;
     document.getElementById("admFaultBadge").textContent = activeFaults.length;
 
-    document.getElementById("cfg-050351").value = appState.stations["050351"];
-    document.getElementById("cfg-050353").value = appState.stations["050353"];
-    document.getElementById("cfg-050354").value = appState.stations["050354"];
+    document.getElementById("cfg-050351").value = appState.stations["050351"] ?? 0;
+    document.getElementById("cfg-050353").value = appState.stations["050353"] ?? 0;
+    document.getElementById("cfg-050354").value = appState.stations["050354"] ?? 0;
 
     populateDropdowns();
     onAdminCompModuloChange();
@@ -559,14 +588,8 @@ function populateDropdowns() {
 
 function onAdminCompModuloChange() {
     const modulo = document.getElementById("compModulo").value;
-    const count = appState.stations[modulo] || 1;
     const estSel = document.getElementById("compEstacion");
-    const prev = estSel.value;
-    estSel.innerHTML = "";
-    for (let i = 1; i <= count; i++) {
-        estSel.innerHTML += `<option value="${i}">Estación ${i}</option>`;
-    }
-    if (prev && Number(prev) <= count) estSel.value = prev;
+    fillStationOptions(estSel, modulo, { selectedValue: estSel.value });
     updateCompAssignedOperatorHint();
 }
 
@@ -576,10 +599,11 @@ function updateCompAssignedOperatorHint() {
     const op = getOperatorByStation(modulo, estacion);
     const hint = document.getElementById("compOperatorHint");
     if (op) {
-        hint.textContent = `${op.nombre} (${op.correo})`;
+        const rolLabel = estacion === 0 ? "Responsable de Módulo" : "Operador";
+        hint.textContent = `${op.nombre} (${rolLabel} • ${op.correo})`;
         hint.className = "text-success";
     } else {
-        hint.textContent = "Sin operador asignado en esta estación";
+        hint.textContent = estacion === 0 ? "Sin Responsable de Módulo asignado en Estación 0" : "Sin operador asignado en esta estación";
         hint.className = "text-danger";
     }
 }
@@ -598,7 +622,7 @@ async function saveComponent(e) {
 
     const dup = appState.components.find(c => c.serie === serie && c.id !== editId);
     if (dup) {
-        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - Estación ${dup.estacion}.`);
+        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
         return;
     }
 
@@ -639,8 +663,7 @@ function editComponent(id) {
     switchAdminTab("inventario");
     document.getElementById("editCompId").value = c.id;
     document.getElementById("compModulo").value = c.modulo;
-    onAdminCompModuloChange();
-    document.getElementById("compEstacion").value = c.estacion;
+    fillStationOptions(document.getElementById("compEstacion"), c.modulo, { selectedValue: c.estacion });
     updateCompAssignedOperatorHint();
     document.getElementById("compTipo").value = c.tipo;
     document.getElementById("compMarca").value = c.marca;
@@ -688,7 +711,8 @@ function renderAdminInventoryTable() {
         if (search) {
             const op = getOperatorByStation(c.modulo, c.estacion);
             const opName = op ? op.nombre.toLowerCase() : "";
-            const haystack = `${c.serie} ${c.marca} ${c.modelo} ${c.tipo} ${opName}`.toLowerCase();
+            const estText = formatStationLabel(c.estacion).toLowerCase();
+            const haystack = `${c.serie} ${c.marca} ${c.modelo} ${c.tipo} ${opName} ${estText}`.toLowerCase();
             if (!haystack.includes(search)) return false;
         }
         return true;
@@ -702,6 +726,7 @@ function renderAdminInventoryTable() {
 
     tbody.innerHTML = filtered.map(c => {
         const op = getOperatorByStation(c.modulo, c.estacion);
+        const isServer = Number(c.estacion) === 0;
         return `
             <tr>
                 <td>
@@ -709,8 +734,15 @@ function renderAdminInventoryTable() {
                         ? `<img src="${c.foto}" class="img-thumb" onclick="showPhotoModal('${c.foto}', '${c.tipo} - ${c.serie}')">`
                         : `<span class="badge bg-light text-muted border">Sin foto</span>`}
                 </td>
-                <td><span class="badge bg-dark">Mód. ${c.modulo}</span><br><small class="fw-bold">Estación ${c.estacion}</small></td>
-                <td class="small">${op ? `<strong>${op.nombre}</strong>` : `<span class="text-danger">Sin asignar</span>`}</td>
+                <td>
+                    <span class="badge bg-dark">Mód. ${c.modulo}</span><br>
+                    <small class="fw-bold ${isServer ? "text-primary" : ""}">${formatStationLabel(c.estacion)}</small>
+                </td>
+                <td class="small">
+                    ${op
+                        ? `<strong>${op.nombre}</strong>${isServer ? `<br><span class="badge bg-info-subtle text-dark border">Resp. Módulo</span>` : ""}`
+                        : `<span class="text-danger">${isServer ? "Sin responsable" : "Sin asignar"}</span>`}
+                </td>
                 <td class="fw-semibold">${c.tipo}</td>
                 <td>${c.marca} <span class="text-muted">${c.modelo}</span></td>
                 <td><span class="font-monospace fw-bold">${c.serie}</span></td>
@@ -727,17 +759,27 @@ function renderAdminInventoryTable() {
     }).join("");
 }
 
-// ==================== GESTIÓN DE OPERADORES (ADMIN) ====================
-function updateOpRegStations() {
+// ==================== GESTIÓN DE OPERADORES Y RESPONSABLES (ADMIN) ====================
+function updateOpRegStations(selectedVal = null) {
     const modulo = document.getElementById("opRegModulo").value;
-    const count = appState.stations[modulo] || 1;
     const sel = document.getElementById("opRegEstacion");
-    const prev = sel.value;
-    sel.innerHTML = "";
-    for (let i = 1; i <= count; i++) {
-        sel.innerHTML += `<option value="${i}">Estación ${i}</option>`;
+    fillStationOptions(sel, modulo, {
+        includeRoleHint: true,
+        selectedValue: selectedVal ?? sel.value
+    });
+    updateOpRoleHint();
+}
+
+function updateOpRoleHint() {
+    const est = Number(document.getElementById("opRegEstacion").value);
+    const hint = document.getElementById("opRoleHint");
+    if (est === 0) {
+        hint.textContent = "Responsable de Módulo (Estación 0 — Servidor)";
+        hint.className = "text-primary";
+    } else {
+        hint.textContent = `Operador de Estación ${est}`;
+        hint.className = "text-dark";
     }
-    if (prev && Number(prev) <= count) sel.value = prev;
 }
 
 async function saveOperator(e) {
@@ -751,7 +793,8 @@ async function saveOperator(e) {
 
     const existingStationOp = appState.operators.find(o => o.modulo === modulo && Number(o.estacion) === estacion && o.id !== editId);
     if (existingStationOp) {
-        if (!confirm(`La Estación ${estacion} del Módulo ${modulo} ya tiene asignado a ${existingStationOp.nombre}. ¿Deseas reemplazarlo?`)) {
+        const estText = formatStationLabel(estacion);
+        if (!confirm(`${estText} del Módulo ${modulo} ya tiene asignado a ${existingStationOp.nombre}. ¿Deseas reemplazarlo?`)) {
             return;
         }
         appState.operators = appState.operators.filter(o => o.id !== existingStationOp.id);
@@ -788,8 +831,11 @@ function editOperator(id) {
     if (!op) return;
     document.getElementById("editOpId").value = op.id;
     document.getElementById("opRegModulo").value = op.modulo;
-    updateOpRegStations();
-    document.getElementById("opRegEstacion").value = op.estacion;
+    fillStationOptions(document.getElementById("opRegEstacion"), op.modulo, {
+        includeRoleHint: true,
+        selectedValue: op.estacion
+    });
+    updateOpRoleHint();
     document.getElementById("opRegNombre").value = op.nombre;
     document.getElementById("opRegTelefono").value = op.telefono;
     document.getElementById("opRegCorreo").value = op.correo;
@@ -802,7 +848,7 @@ function editOperator(id) {
         document.getElementById("opPhotoPreview").classList.add("d-none");
     }
 
-    document.getElementById("opFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Operador`;
+    document.getElementById("opFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Registro`;
     document.getElementById("btnCancelEditOp").classList.remove("d-none");
 }
 
@@ -810,13 +856,13 @@ function resetOperatorForm() {
     document.getElementById("operatorForm").reset();
     document.getElementById("editOpId").value = "";
     clearImageField("opFotoInput", "opPhotoPreview", "currentOpPhoto");
-    document.getElementById("opFormTitle").innerHTML = `<i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar / Asignar Operador`;
+    document.getElementById("opFormTitle").innerHTML = `<i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable`;
     document.getElementById("btnCancelEditOp").classList.add("d-none");
     updateOpRegStations();
 }
 
 async function deleteOperator(id) {
-    if (!confirm("¿Eliminar este operador del sistema?")) return;
+    if (!confirm("¿Eliminar este registro del sistema?")) return;
     appState.operators = appState.operators.filter(o => o.id !== id);
     await saveState();
     refreshAdminUI();
@@ -826,19 +872,24 @@ function renderOperatorsTable() {
     const filterMod = document.getElementById("filterOpModulo").value;
     const list = appState.operators
         .filter(o => filterMod === "ALL" || o.modulo === filterMod)
-        .sort((a, b) => a.modulo.localeCompare(b.modulo) || a.estacion - b.estacion);
+        .sort((a, b) => a.modulo.localeCompare(b.modulo) || Number(a.estacion) - Number(b.estacion));
 
     const tbody = document.getElementById("operatorsTableBody");
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No hay operadores registrados.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No hay operadores ni responsables registrados.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = list.map(o => `
+    tbody.innerHTML = list.map(o => {
+        const isServer = Number(o.estacion) === 0;
+        return `
         <tr>
             <td><img src="${o.foto || DEFAULT_AVATAR}" class="avatar-table" onclick="showPhotoModal('${o.foto || DEFAULT_AVATAR}', '${o.nombre}')"></td>
-            <td><span class="badge bg-dark">Mód. ${o.modulo}</span> <span class="badge btn-pink">Est. ${o.estacion}</span></td>
-            <td class="fw-bold">${o.nombre}</td>
+            <td>
+                <span class="badge bg-dark">Mód. ${o.modulo}</span>
+                <span class="badge ${isServer ? "bg-primary" : "btn-pink"}">${isServer ? "Est. 0 • Servidor" : `Est. ${o.estacion}`}</span>
+            </td>
+            <td class="fw-bold">${o.nombre}${isServer ? `<br><small class="text-primary">Responsable de Módulo</small>` : ""}</td>
             <td class="small">${o.telefono}</td>
             <td class="small text-primary">${o.correo}</td>
             <td class="text-end">
@@ -848,17 +899,17 @@ function renderOperatorsTable() {
                 </div>
             </td>
         </tr>
-    `).join("");
+    `}).join("");
 }
 
 // ==================== CONFIGURACIÓN DE ESTACIONES Y CATÁLOGOS ====================
 async function saveStationCounts() {
-    appState.stations["050351"] = Math.max(1, Number(document.getElementById("cfg-050351").value));
-    appState.stations["050353"] = Math.max(1, Number(document.getElementById("cfg-050353").value));
-    appState.stations["050354"] = Math.max(1, Number(document.getElementById("cfg-050354").value));
+    appState.stations["050351"] = Math.max(0, Number(document.getElementById("cfg-050351").value));
+    appState.stations["050353"] = Math.max(0, Number(document.getElementById("cfg-050353").value));
+    appState.stations["050354"] = Math.max(0, Number(document.getElementById("cfg-050354").value));
     await saveState();
     refreshAdminUI();
-    alert("Cantidad de estaciones actualizada correctamente y sincronizada en la nube.");
+    alert("Estaciones actualizadas correctamente (la Estación 0 - Servidor permanece activa en los 3 módulos).");
 }
 
 function renderCatalogs() {
@@ -907,7 +958,7 @@ function openReportFaultModal(compId) {
     document.getElementById("faultCompId").value = comp.id;
     document.getElementById("faultCompInfo").textContent = `${comp.tipo} — ${comp.marca} ${comp.modelo}`;
     document.getElementById("faultCompSerie").textContent = comp.serie;
-    document.getElementById("faultLocationInfo").textContent = `Módulo ${comp.modulo} | Estación ${comp.estacion} (${op ? op.nombre : "Sin operador"})`;
+    document.getElementById("faultLocationInfo").textContent = `Módulo ${comp.modulo} | ${formatStationLabel(comp.estacion)} (${op ? op.nombre : "Sin asignar"})`;
 
     document.getElementById("faultForm").reset();
     clearImageField("faultPhotoInput", "faultPhotoPreview", "currentFaultPhoto");
@@ -930,7 +981,7 @@ async function submitFaultReport(e) {
         folio,
         fecha: new Date().toLocaleString("es-MX"),
         modulo: comp.modulo,
-        estacion: comp.estacion,
+        estacion: Number(comp.estacion),
         operadorNombre: op ? op.nombre : "Administrador / No asignado",
         operadorTelefono: op ? op.telefono : "N/A",
         operadorCorreo: op ? op.correo : "N/A",
@@ -1011,7 +1062,7 @@ function renderAdminFaultsTable() {
         return `
         <tr>
             <td class="fw-bold text-danger font-monospace">${f.folio}<br><small class="text-muted fw-normal">${f.fecha}</small></td>
-            <td><span class="badge bg-dark">Mód. ${f.modulo}</span><br><small>Estación ${f.estacion}</small></td>
+            <td><span class="badge bg-dark">Mód. ${f.modulo}</span><br><small>${formatStationLabel(f.estacion)}</small></td>
             <td class="small"><strong>${f.operadorNombre}</strong><br><span class="text-muted">${f.operadorTelefono}</span></td>
             <td><strong>${f.compTipo}</strong><br><small class="font-monospace">${f.compSerie}</small></td>
             <td class="small"><strong>${f.categoria}:</strong> ${f.descripcion}</td>
@@ -1077,7 +1128,7 @@ function openPrintFaultFormat(faultId, mode = "initial") {
             <div class="col-4">
                 <div style="border-top: 1px solid #000; margin: 0 10px; padding-top: 4px;">
                     <strong>${f.operadorNombre}</strong><br>
-                    <small>Operador MAC (Recibe de Conformidad)</small>
+                    <small>${Number(f.estacion) === 0 ? "Responsable de Módulo" : "Operador MAC"} (Recibe de Conformidad)</small>
                 </div>
             </div>
             <div class="col-4">
@@ -1098,7 +1149,7 @@ function openPrintFaultFormat(faultId, mode = "initial") {
             <div class="col-6">
                 <div style="border-top: 1px solid #000; margin: 0 25px; padding-top: 5px;">
                     <strong>${f.operadorNombre}</strong><br>
-                    <small>Firma del Operador del Módulo MAC</small>
+                    <small>Firma (${Number(f.estacion) === 0 ? "Responsable de Módulo" : "Operador del Módulo MAC"})</small>
                 </div>
             </div>
             <div class="col-6">
@@ -1126,8 +1177,8 @@ function openPrintFaultFormat(faultId, mode = "initial") {
             <div class="print-box-title">1. Datos de Ubicación y Operador Responsable</div>
             <div class="row">
                 <div class="col-6"><strong>Módulo MAC:</strong> ${f.modulo}</div>
-                <div class="col-6"><strong>Estación de Trabajo:</strong> Estación ${f.estacion}</div>
-                <div class="col-12 mt-1"><strong>Nombre del Operador:</strong> ${f.operadorNombre}</div>
+                <div class="col-6"><strong>Estación de Trabajo:</strong> ${formatStationLabel(f.estacion)}</div>
+                <div class="col-12 mt-1"><strong>Nombre:</strong> ${f.operadorNombre}</div>
                 <div class="col-6 mt-1"><strong>Teléfono:</strong> ${f.operadorTelefono}</div>
                 <div class="col-6 mt-1"><strong>Correo Institucional:</strong> ${f.operadorCorreo}</div>
             </div>
@@ -1209,9 +1260,9 @@ function exportInventoryExcel() {
         return {
             "#": idx + 1,
             "Módulo MAC": c.modulo,
-            "Estación": `Estación ${c.estacion}`,
-            "Operador Asignado": op ? op.nombre : "Sin asignar",
-            "Teléfono Operador": op ? op.telefono : "",
+            "Estación": formatStationLabel(c.estacion),
+            "Operador / Responsable": op ? op.nombre : "Sin asignar",
+            "Teléfono": op ? op.telefono : "",
             "Correo Institucional": op ? op.correo : "",
             "Tipo de Componente": c.tipo,
             "Marca": c.marca,
@@ -1227,7 +1278,7 @@ function exportInventoryExcel() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-        { wch: 5 }, { wch: 12 }, { wch: 12 }, { wch: 28 }, { wch: 16 },
+        { wch: 5 }, { wch: 12 }, { wch: 22 }, { wch: 28 }, { wch: 16 },
         { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 22 },
         { wch: 14 }, { wch: 22 }, { wch: 25 }, { wch: 20 }
     ];
@@ -1237,13 +1288,14 @@ function exportInventoryExcel() {
         const opRows = appState.operators.map((o, i) => ({
             "#": i + 1,
             "Módulo": o.modulo,
-            "Estación": `Estación ${o.estacion}`,
+            "Estación": formatStationLabel(o.estacion),
+            "Rol": Number(o.estacion) === 0 ? "Responsable de Módulo" : "Operador",
             "Nombre Completo": o.nombre,
             "Teléfono": o.telefono,
             "Correo Institucional": o.correo
         }));
         const wsOp = XLSX.utils.json_to_sheet(opRows);
-        XLSX.utils.book_append_sheet(wb, wsOp, "Operadores Asignados");
+        XLSX.utils.book_append_sheet(wb, wsOp, "Operadores y Responsables");
     }
 
     const fecha = new Date().toISOString().slice(0, 10);
@@ -1261,8 +1313,8 @@ function exportFaultsExcel() {
         "Folio": f.folio,
         "Fecha Reporte": f.fecha,
         "Módulo": f.modulo,
-        "Estación": `Estación ${f.estacion}`,
-        "Operador": f.operadorNombre,
+        "Estación": formatStationLabel(f.estacion),
+        "Operador / Responsable": f.operadorNombre,
         "Teléfono": f.operadorTelefono,
         "Correo": f.operadorCorreo,
         "Componente": f.compTipo,
@@ -1280,7 +1332,7 @@ function exportFaultsExcel() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-        { wch: 5 }, { wch: 20 }, { wch: 18 }, { wch: 10 }, { wch: 12 },
+        { wch: 5 }, { wch: 20 }, { wch: 18 }, { wch: 10 }, { wch: 22 },
         { wch: 26 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 20 },
         { wch: 20 }, { wch: 22 }, { wch: 35 }, { wch: 18 }, { wch: 18 },
         { wch: 24 }, { wch: 24 }, { wch: 35 }
@@ -1311,6 +1363,7 @@ Object.assign(window, {
     deleteComponent,
     renderAdminInventoryTable,
     updateOpRegStations,
+    updateOpRoleHint,
     saveOperator,
     editOperator,
     resetOperatorForm,
