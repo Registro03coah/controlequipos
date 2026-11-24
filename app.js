@@ -7,19 +7,20 @@ const SESSION_STORAGE_KEY = "macs_active_session_v1";
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cbd5e1'/><circle cx='50' cy='38' r='18' fill='%2364748b'/><path d='M20 88 C20 65, 80 65, 80 88' fill='%2364748b'/></svg>";
 
 const DEFAULT_STATE = {
-    stations: { "050351": 4, "050353": 3, "050354": 3 },
-    brands: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Logitech", "Topaz", "Crossmatch", "Suprema", "Brother", "NO APLICA", "Genérico"],
+    stations: { "050351": 8, "050353": 2, "050354": 2 },
+    brands: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Wacom", "Suprema", "Morpho", "Xerox", "Samsung", "Nextep", "ImageTeam", "Syble", "Brother", "NO APLICA", "Genérico"],
     types: [
         "Computadora / CPU",
+        "Laptop",
+        "Servidor",
         "Monitor",
-        "Escáner Plano",
-        "Impresora",
-        "Decadactilar (Huellas)",
-        "Pad de Firmas",
         "Cámara Fotográfica",
+        "Pad de Firmas",
+        "Escáner de Huellas",
+        "Impresora",
+        "Escáner Digitalizador",
         "Lector QR / Código Barras",
-        "No-Break / UPS",
-        "Servidor"
+        "No-Break / UPS"
     ],
     operators: [],
     components: [],
@@ -1436,7 +1437,165 @@ function closeScanner() {
     if (modalInstance) modalInstance.hide();
 }
 
-// ==================== EXPORTACIÓN EXCEL (.XLSX) ====================
+// ==================== PLANTILLA, IMPORTACIÓN Y EXPORTACIÓN EXCEL (.XLSX / .CSV) ====================
+function downloadImportTemplate() {
+    const sampleRows = [
+        {
+            "Modulo": "050351",
+            "Estacion": 0,
+            "Tipo": "Servidor",
+            "Marca": "Dell",
+            "Modelo": "PowerEdge",
+            "Serie": "J101CBVA",
+            "InventarioINE": "",
+            "Estado": "Operativo",
+            "Notas": "Servidor Módulo 050351"
+        },
+        {
+            "Modulo": "050351",
+            "Estacion": 1,
+            "Tipo": "Cámara Fotográfica",
+            "Marca": "Canon",
+            "Modelo": "EOS REBEL T7",
+            "Serie": "182072002447",
+            "InventarioINE": "",
+            "Estado": "Operativo",
+            "Notas": "Cliente 1"
+        },
+        {
+            "Modulo": "050351",
+            "Estacion": 1,
+            "Tipo": "Pad de Firmas",
+            "Marca": "Wacom",
+            "Modelo": "STU-540",
+            "Serie": "1AQ0021006261",
+            "InventarioINE": "",
+            "Estado": "Operativo",
+            "Notas": "Cliente 1"
+        }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    ws["!cols"] = [
+        { wch: 10 }, { wch: 10 }, { wch: 24 }, { wch: 15 },
+        { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 25 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Importacion");
+    XLSX.writeFile(wb, "Plantilla_Importacion_MACs.xlsx");
+}
+
+function parseStationFromExcel(val) {
+    if (typeof val === "number") return Math.max(0, Math.floor(val));
+    const txt = String(val ?? "").trim().toLowerCase();
+    if (!txt || txt === "0" || txt.includes("servidor")) return 0;
+    const match = txt.match(/(\d+)/);
+    return match ? Number(match[1]) : 0;
+}
+
+async function importInventoryExcel(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: "array" });
+        const firstSheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+        if (!rows.length) {
+            alert("El archivo no contiene filas de datos.");
+            event.target.value = "";
+            return;
+        }
+
+        let added = 0;
+        let skippedDup = 0;
+        let invalidRows = 0;
+
+        for (const raw of rows) {
+            const moduloRaw = String(raw["Modulo"] ?? raw["Módulo"] ?? raw["Módulo MAC"] ?? raw["ID de MAC"] ?? "").trim();
+            const modulo = moduloRaw.padStart(6, "0");
+            const estacion = parseStationFromExcel(raw["Estacion"] ?? raw["Estación"] ?? raw["Estación de trabajo"]);
+            const tipo = String(raw["Tipo"] ?? raw["Tipo de Componente"] ?? raw["Componente"] ?? "").trim() || "Computadora / CPU";
+            const marcaRaw = String(raw["Marca"] ?? "Genérico").trim() || "Genérico";
+            const marca = marcaRaw.toUpperCase() === "NO APLICA" ? "NO APLICA" : marcaRaw;
+            const modelo = String(raw["Modelo"] ?? (marca === "NO APLICA" ? "NO APLICA" : "N/A")).trim() || "N/A";
+            const inventarioIne = String(raw["InventarioINE"] ?? raw["Inventario INE"] ?? raw["inventario interno"] ?? "").trim().toUpperCase();
+            const notas = String(raw["Notas"] ?? raw["Observaciones"] ?? "").trim();
+
+            let serie = String(raw["Serie"] ?? raw["Número de Serie"] ?? "").trim().toUpperCase();
+            if (!serie && marca === "NO APLICA") {
+                const tag = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 10);
+                serie = `NA-${modulo || "000000"}-E${estacion}-${tag}-${Date.now().toString().slice(-4)}-${added}`;
+            }
+
+            if (!["050351", "050353", "050354"].includes(modulo) || !serie) {
+                invalidRows++;
+                continue;
+            }
+
+            const exists = appState.components.some(c => c.serie === serie);
+            if (exists) {
+                skippedDup++;
+                continue;
+            }
+
+            let estado = String(raw["Estado"] ?? raw["Estado Físico"] ?? "").trim();
+            const validStates = ["Operativo", "Stock", "En Falla", "En Revisión", "No Aplica", "Baja"];
+            if (!validStates.includes(estado)) {
+                estado = marca === "NO APLICA" ? "No Aplica" : "Operativo";
+            }
+
+            if (marca && !appState.brands.some(b => b.toLowerCase() === marca.toLowerCase())) {
+                appState.brands.push(marca);
+            }
+            if (tipo && !appState.types.some(t => t.toLowerCase() === tipo.toLowerCase())) {
+                appState.types.push(tipo);
+            }
+
+            const maxEst = Number(appState.stations[modulo] ?? 0);
+            if (estacion > maxEst) {
+                appState.stations[modulo] = estacion;
+            }
+
+            appState.components.push({
+                id: "CMP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+                modulo,
+                estacion,
+                tipo,
+                marca,
+                modelo,
+                serie,
+                inventarioIne,
+                estado,
+                notas,
+                foto: "",
+                registradoPor: "Importación Excel",
+                fechaRegistro: new Date().toLocaleString("es-MX")
+            });
+            added++;
+        }
+
+        if (added > 0) {
+            await saveState();
+            refreshAdminUI({ preserveSelection: true });
+        }
+
+        alert(
+            `Importación finalizada:\n` +
+            `• Agregados: ${added}\n` +
+            `• Omitidos por serie duplicada: ${skippedDup}\n` +
+            `• Filas incompletas/inválidas: ${invalidRows}`
+        );
+    } catch (err) {
+        console.error("Error al importar archivo:", err);
+        alert("No se pudo leer el archivo. Verifica que sea un .xlsx, .xls o .csv válido.");
+    } finally {
+        event.target.value = "";
+    }
+}
+
 function exportInventoryExcel() {
     if (appState.components.length === 0) {
         alert("No hay componentes registrados para exportar.");
@@ -1573,6 +1732,8 @@ Object.assign(window, {
     previewImageFile,
     clearImageField,
     showPhotoModal,
+    downloadImportTemplate,
+    importInventoryExcel,
     exportInventoryExcel,
     exportFaultsExcel
 });
