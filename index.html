@@ -34,7 +34,7 @@
                 <ul class="nav nav-pills nav-fill mb-4 bg-light p-1 rounded-3" id="loginRoleTabs">
                     <li class="nav-item">
                         <button class="nav-link active" id="tab-op-login" type="button" onclick="switchLoginTab('operator')">
-                            <i class="bi bi-person-badge me-1"></i> Soy Operador
+                            <i class="bi bi-person-badge me-1"></i> Soy Operador / Resp.
                         </button>
                     </li>
                     <li class="nav-item">
@@ -44,7 +44,7 @@
                     </li>
                 </ul>
 
-                <!-- Formulario Acceso Operador -->
+                <!-- Formulario Acceso Operador / Responsable de Módulo -->
                 <form id="operatorLoginForm" onsubmit="loginAsOperator(event)">
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Selecciona tu Módulo MAC</label>
@@ -55,16 +55,16 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Selecciona tu Estación de Trabajo</label>
+                        <label class="form-label fw-semibold">Selecciona tu Estación de Trabajo (0 = Servidor)</label>
                         <select class="form-select form-select-lg" id="loginEstacion" required onchange="previewOperatorProfile()"></select>
                     </div>
 
-                    <!-- Vista previa del operador registrado por el Admin -->
+                    <!-- Vista previa del operador / responsable registrado por el Admin -->
                     <div id="operatorLoginPreview" class="alert alert-light border d-flex align-items-center gap-3 mb-4">
                         <img id="previewOpPhoto" src="" alt="Operador" class="avatar-operator">
                         <div>
-                            <div class="small text-muted">Operador Asignado:</div>
-                            <div id="previewOpName" class="fw-bold text-dark">Sin operador asignado</div>
+                            <div class="small text-muted">Responsable / Operador Asignado:</div>
+                            <div id="previewOpName" class="fw-bold text-dark">Sin responsable asignado</div>
                             <div id="previewOpEmail" class="small text-secondary">Solicita al Administrador tu registro</div>
                         </div>
                     </div>
@@ -77,7 +77,7 @@
                 <!-- Formulario Acceso Administrador -->
                 <form id="adminLoginForm" class="d-none" onsubmit="loginAsAdmin(event)">
                     <div class="alert alert-secondary small">
-                        <i class="bi bi-info-circle me-1"></i> Acceso exclusivo para gestión de estaciones, operadores, marcas, inventario global y exportación Excel.
+                        <i class="bi bi-info-circle me-1"></i> Acceso exclusivo para gestión de estaciones, operadores/responsables, marcas, inventario global y exportación Excel.
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Contraseña de Administrador</label>
@@ -117,9 +117,9 @@
 
         <div class="container-fluid px-3 px-lg-4 py-4">
 
-            <!-- ================= VISTA DEL OPERADOR (REGISTRO PROPIO + FALLAS, SIN BORRAR) ================= -->
+            <!-- ================= VISTA DEL OPERADOR / RESPONSABLE DE MÓDULO ================= -->
             <div id="operatorView" class="d-none">
-                <!-- Ficha de Identidad del Operador -->
+                <!-- Ficha de Identidad -->
                 <div class="card card-custom p-3 p-md-4 mb-4">
                     <div class="row align-items-center g-3">
                         <div class="col-auto">
@@ -162,7 +162,6 @@
                 <!-- Tab 1 Operador: Registrar y Ver Componentes de su Estación -->
                 <div id="opSectionEquipos">
                     <div class="row g-4">
-                        <!-- Formulario del Operador para Registrar/Editar Componentes de su Estación -->
                         <div class="col-lg-4">
                             <div class="card card-custom p-3 p-md-4">
                                 <h5 class="fw-bold mb-3" id="opCompFormTitle">
@@ -232,7 +231,6 @@
                             </div>
                         </div>
 
-                        <!-- Tabla de Componentes de la Estación del Operador -->
                         <div class="col-lg-8">
                             <div class="card card-custom p-3 p-md-4">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
@@ -288,7 +286,6 @@
 
             <!-- ================= VISTA DEL ADMINISTRADOR ================= -->
             <div id="adminView" class="d-none">
-                <!-- Tarjetas de Resumen Global -->
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-xl-3">
                         <div class="card card-custom stat-card p-3">
@@ -298,7 +295,7 @@
                     </div>
                     <div class="col-6 col-xl-3">
                         <div class="card card-custom stat-card p-3" style="border-left-color: #0d6efd;">
-                            <small class="text-muted fw-bold">OPERADORES REGISTRADOS</small>
+                            <small class="text-muted fw-bold">OPERADORES / RESP.</small>
                             <h3 class="fw-bold mb-0 mt-1 text-primary" id="adminStatOperators">0</h3>
                         </div>
                     </div>
@@ -316,7 +313,6 @@
                     </div>
                 </div>
 
-                <!-- Navegación Principal del Administrador -->
                 <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm flex-wrap">
                     <li class="nav-item">
                         <button class="nav-link active" id="adm-tab-inventario" onclick="switchAdminTab('inventario')">
@@ -325,7 +321,7 @@
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="adm-tab-operadores" onclick="switchAdminTab('operadores')">
-                            <i class="bi bi-people-fill me-1"></i> 2. Operadores y Asignación
+                            <i class="bi bi-people-fill me-1"></i> 2. Operadores y Responsables (Est. 0)
                         </button>
                     </li>
                     <li class="nav-item">
@@ -361,14 +357,14 @@
                                             </select>
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label fw-semibold small">Estación *</label>
+                                            <label class="form-label fw-semibold small">Estación (0 = Servidor) *</label>
                                             <select class="form-select" id="compEstacion" required onchange="updateCompAssignedOperatorHint()"></select>
                                         </div>
                                     </div>
 
                                     <div class="alert alert-light border py-2 px-3 mb-3 small">
                                         <i class="bi bi-person-check-fill text-primary me-1"></i>
-                                        Operador asignado: <strong id="compOperatorHint">Sin asignar</strong>
+                                        Asignado: <strong id="compOperatorHint">Sin asignar</strong>
                                     </div>
 
                                     <div class="mb-3">
@@ -467,7 +463,7 @@
                                             <tr>
                                                 <th>Foto</th>
                                                 <th>Módulo / Estación</th>
-                                                <th>Operador Asignado</th>
+                                                <th>Operador / Resp.</th>
                                                 <th>Componente</th>
                                                 <th>Marca / Modelo</th>
                                                 <th>N° Serie</th>
@@ -483,13 +479,13 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN ADMIN 2: OPERADORES Y ASIGNACIÓN A MÓDULO / ESTACIÓN -->
+                <!-- SECCIÓN ADMIN 2: OPERADORES Y RESPONSABLES DE MÓDULO (ESTACIÓN 0) -->
                 <div id="admSectionOperadores" class="d-none">
                     <div class="row g-4">
                         <div class="col-lg-4">
                             <div class="card card-custom p-3 p-md-4">
                                 <h5 class="fw-bold mb-3" id="opFormTitle">
-                                    <i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar / Asignar Operador
+                                    <i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable
                                 </h5>
                                 <form id="operatorForm" onsubmit="saveOperator(event)">
                                     <input type="hidden" id="editOpId" value="">
@@ -503,13 +499,18 @@
                                             </select>
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label fw-semibold small">Estación Asignada *</label>
-                                            <select class="form-select" id="opRegEstacion" required></select>
+                                            <label class="form-label fw-semibold small">Estación (0 = Servidor) *</label>
+                                            <select class="form-select" id="opRegEstacion" required onchange="updateOpRoleHint()"></select>
                                         </div>
                                     </div>
 
+                                    <div class="alert alert-info py-2 px-3 mb-3 small">
+                                        <i class="bi bi-info-circle-fill me-1"></i>
+                                        Rol de estación: <strong id="opRoleHint">Operador de Estación</strong>
+                                    </div>
+
                                     <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Nombre Completo del Operador *</label>
+                                        <label class="form-label fw-semibold small">Nombre Completo *</label>
                                         <input type="text" class="form-control" id="opRegNombre" placeholder="Ej. Juan Carlos Pérez López" required>
                                     </div>
 
@@ -524,7 +525,7 @@
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Fotografía del Operador</label>
+                                        <label class="form-label fw-semibold small">Fotografía</label>
                                         <input type="file" class="form-control" id="opFotoInput" accept="image/*" capture="user" onchange="previewImageFile(event, 'opPhotoPreview', 'opPhotoImg', 'currentOpPhoto')">
                                         <div id="opPhotoPreview" class="mt-2 d-none text-center">
                                             <img id="opPhotoImg" src="" alt="Foto Operador" class="avatar-operator">
@@ -534,7 +535,7 @@
 
                                     <div class="d-grid gap-2">
                                         <button type="submit" class="btn btn-pink">
-                                            <i class="bi bi-person-check-fill me-1"></i>Guardar Operador
+                                            <i class="bi bi-person-check-fill me-1"></i>Guardar Registro
                                         </button>
                                         <button type="button" id="btnCancelEditOp" class="btn btn-outline-secondary d-none" onclick="resetOperatorForm()">
                                             Cancelar Edición
@@ -547,7 +548,7 @@
                         <div class="col-lg-8">
                             <div class="card card-custom p-3 p-md-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="fw-bold mb-0"><i class="bi bi-person-lines-fill text-danger me-2"></i>Plantilla de Operadores por Estación</h5>
+                                    <h5 class="fw-bold mb-0"><i class="bi bi-person-lines-fill text-danger me-2"></i>Responsables de Módulo (Est. 0) y Operadores</h5>
                                     <select class="form-select w-auto" id="filterOpModulo" onchange="renderOperatorsTable()">
                                         <option value="ALL">Todos los Módulos</option>
                                         <option value="050351">Módulo 050351</option>
@@ -580,19 +581,19 @@
                     <div class="row g-4">
                         <div class="col-lg-4">
                             <div class="card card-custom p-4 h-100">
-                                <h5 class="fw-bold mb-3"><i class="bi bi-building-gear text-danger me-2"></i>Estaciones por Módulo</h5>
-                                <p class="text-muted small">Define cuántas estaciones de trabajo operan en cada módulo MAC.</p>
+                                <h5 class="fw-bold mb-3"><i class="bi bi-building-gear text-danger me-2"></i>Estaciones Operativas por Módulo</h5>
+                                <p class="text-muted small">La <strong>Estación 0 (Servidor)</strong> se incluye automáticamente en los 3 módulos. Aquí defines cuántas estaciones operativas adicionales (1, 2, 3...) tiene cada módulo.</p>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Módulo 050351</label>
-                                    <input type="number" class="form-control" id="cfg-050351" min="1" max="30">
+                                    <label class="form-label fw-bold">Módulo 050351 (Estaciones 1 a N)</label>
+                                    <input type="number" class="form-control" id="cfg-050351" min="0" max="30">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Módulo 050353</label>
-                                    <input type="number" class="form-control" id="cfg-050353" min="1" max="30">
+                                    <label class="form-label fw-bold">Módulo 050353 (Estaciones 1 a N)</label>
+                                    <input type="number" class="form-control" id="cfg-050353" min="0" max="30">
                                 </div>
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">Módulo 050354</label>
-                                    <input type="number" class="form-control" id="cfg-050354" min="1" max="30">
+                                    <label class="form-label fw-bold">Módulo 050354 (Estaciones 1 a N)</label>
+                                    <input type="number" class="form-control" id="cfg-050354" min="0" max="30">
                                 </div>
                                 <button class="btn btn-pink w-100 mt-auto" onclick="saveStationCounts()">
                                     <i class="bi bi-check-circle me-1"></i>Actualizar Estaciones
@@ -615,9 +616,9 @@
                         <div class="col-lg-4">
                             <div class="card card-custom p-4 h-100">
                                 <h5 class="fw-bold mb-3"><i class="bi bi-pc text-danger me-2"></i>Tipos de Componentes</h5>
-                                <p class="text-muted small">Equipos digitales que conforman cada estación.</p>
+                                <p class="text-muted small">Equipos digitales que conforman cada estación y servidor.</p>
                                 <div class="input-group mb-3">
-                                    <input type="text" class="form-control" id="newTypeInput" placeholder="Nuevo tipo (ej. Monitor)">
+                                    <input type="text" class="form-control" id="newTypeInput" placeholder="Nuevo tipo (ej. Servidor / Rack)">
                                     <button class="btn btn-dark" type="button" onclick="addCatalogItem('types', 'newTypeInput')">Agregar</button>
                                 </div>
                                 <div id="typesListContainer" class="d-flex flex-wrap gap-2"></div>
@@ -644,7 +645,7 @@
                                     <tr>
                                         <th>Folio</th>
                                         <th>Módulo / Estación</th>
-                                        <th>Operador</th>
+                                        <th>Operador / Resp.</th>
                                         <th>Componente / Serie</th>
                                         <th>Falla Reportada</th>
                                         <th>Estatus / Dictamen</th>
