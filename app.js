@@ -36,7 +36,6 @@ let targetScannerInputId = null;
 
 // Variables temporales para imágenes base64
 let currentCompPhoto = "";
-let currentOpCompPhoto = "";
 let currentOpPhoto = "";
 let currentFaultPhoto = "";
 
@@ -87,6 +86,12 @@ function formatStationLabel(estacion, includeRoleHint = false) {
     return `Estación ${num}`;
 }
 
+function formatCompactPerson(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length <= 2) return parts.join(" ");
+    return `${parts[0]} ${parts[1]}`;
+}
+
 function fillStationOptions(selectEl, modulo, options = {}) {
     const { includeOperatorName = false, includeRoleHint = false, selectedValue = 0 } = options;
     const rawCount = appState.stations[modulo];
@@ -94,13 +99,13 @@ function fillStationOptions(selectEl, modulo, options = {}) {
 
     selectEl.innerHTML = "";
     for (let i = 0; i <= count; i++) {
+        const baseShort = i === 0 ? "Est. 0 (Servidor)" : `Est. ${i}`;
         let label = formatStationLabel(i, includeRoleHint);
         if (includeOperatorName) {
             const op = getOperatorByStation(modulo, i);
-            const roleWord = i === 0 ? "responsable" : "operador";
             label = op
-                ? `${formatStationLabel(i)} — ${op.nombre}`
-                : `${formatStationLabel(i)} (Sin ${roleWord} asignado)`;
+                ? `${baseShort} • ${formatCompactPerson(op.nombre)}`
+                : `${baseShort} • Sin asignar`;
         }
         selectEl.innerHTML += `<option value="${i}">${label}</option>`;
     }
@@ -113,17 +118,30 @@ function fillStationOptions(selectEl, modulo, options = {}) {
     }
 }
 
-// ==================== APAGADO / ACTIVACIÓN DE CAMPOS AL ELEGIR "NO APLICA" ====================
-function applyBrandLockState(mode) {
-    const isAdmin = mode === "admin";
-    const marca = document.getElementById(isAdmin ? "compMarca" : "opCompMarca").value;
-    const isNoAplica = marca === "NO APLICA";
+// ==================== MODAL FLOTANTE DE COMPONENTE (REGISTRAR / EDITAR) ====================
+function populateModalDropdowns() {
+    const brandSel = document.getElementById("compMarca");
+    const currBrand = brandSel.value;
+    const brandsList = appState.brands.includes("NO APLICA") ? appState.brands : ["NO APLICA", ...appState.brands];
+    brandSel.innerHTML = brandsList.map(b => `<option value="${b}">${b}</option>`).join("");
+    if (currBrand && brandsList.includes(currBrand)) brandSel.value = currBrand;
 
-    const modeloEl = document.getElementById(isAdmin ? "compModelo" : "opCompModelo");
-    const serieEl = document.getElementById(isAdmin ? "compSerie" : "opCompSerie");
-    const invIneEl = document.getElementById(isAdmin ? "compInventarioIne" : "opCompInventarioIne");
-    const estadoEl = document.getElementById(isAdmin ? "compEstado" : "opCompEstado");
-    const scanBtnEl = document.getElementById(isAdmin ? "btnAdmScanSerie" : "btnOpScanSerie");
+    const typeSel = document.getElementById("compTipo");
+    const currType = typeSel.value;
+    typeSel.innerHTML = appState.types.map(t => `<option value="${t}">${t}</option>`).join("");
+    if (currType && appState.types.includes(currType)) typeSel.value = currType;
+}
+
+function applyModalBrandLockState() {
+    const marca = document.getElementById("compMarca").value;
+    const isNoAplica = marca === "NO APLICA";
+    const ctx = document.getElementById("compFormContext").value;
+
+    const modeloEl = document.getElementById("compModelo");
+    const serieEl = document.getElementById("compSerie");
+    const invIneEl = document.getElementById("compInventarioIne");
+    const estadoEl = document.getElementById("compEstado");
+    const scanBtnEl = document.getElementById("btnCompScanSerie");
 
     modeloEl.disabled = isNoAplica;
     serieEl.disabled = isNoAplica;
@@ -131,10 +149,10 @@ function applyBrandLockState(mode) {
     if (scanBtnEl) scanBtnEl.disabled = isNoAplica;
 
     if (isNoAplica) {
-        const modulo = isAdmin ? document.getElementById("compModulo").value : currentUser.modulo;
-        const estacion = isAdmin ? Number(document.getElementById("compEstacion").value) : Number(currentUser.estacion);
-        const tipo = document.getElementById(isAdmin ? "compTipo" : "opCompTipo").value;
-        const editId = document.getElementById(isAdmin ? "editCompId" : "opEditCompId").value;
+        const modulo = ctx === "op" && currentUser ? currentUser.modulo : document.getElementById("compModulo").value;
+        const estacion = ctx === "op" && currentUser ? Number(currentUser.estacion) : Number(document.getElementById("compEstacion").value);
+        const tipo = document.getElementById("compTipo").value;
+        const editId = document.getElementById("editCompId").value;
 
         modeloEl.value = "NO APLICA";
         invIneEl.value = "NO APLICA";
@@ -159,13 +177,216 @@ function applyBrandLockState(mode) {
     }
 }
 
-function onBrandOrTypeChange(mode) {
-    applyBrandLockState(mode);
+function onModalBrandOrTypeChange() {
+    applyModalBrandLockState();
 }
 
-function onAdminStationOrBrandChange() {
-    updateCompAssignedOperatorHint();
-    applyBrandLockState("admin");
+function openComponentModal(context = "admin", compToEdit = null) {
+    populateModalDropdowns();
+    document.getElementById("componentForm").reset();
+    clearImageField("compFotoInput", "compPhotoPreview", "currentCompPhoto");
+    document.getElementById("compFormContext").value = context;
+
+    const locRow = document.getElementById("compAdminLocationRow");
+    if (context === "op" && currentUser) {
+        locRow.classList.add("d-none");
+    } else {
+        locRow.classList.remove("d-none");
+        const mod = compToEdit ? compToEdit.modulo : (document.getElementById("compModulo").value || "050351");
+        const est = compToEdit ? compToEdit.estacion : 0;
+        document.getElementById("compModulo").value = mod;
+        fillStationOptions(document.getElementById("compEstacion"), mod, { selectedValue: est });
+        updateCompAssignedOperatorHint();
+    }
+
+    if (compToEdit) {
+        document.getElementById("editCompId").value = compToEdit.id;
+        document.getElementById("compModalTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente`;
+        document.getElementById("compTipo").value = compToEdit.tipo;
+
+        const marcaSel = document.getElementById("compMarca");
+        if (![...marcaSel.options].some(o => o.value === compToEdit.marca)) {
+            marcaSel.innerHTML = `<option value="${compToEdit.marca}">${compToEdit.marca}</option>` + marcaSel.innerHTML;
+        }
+        marcaSel.value = compToEdit.marca;
+
+        document.getElementById("compModelo").value = compToEdit.modelo;
+        document.getElementById("compSerie").value = compToEdit.serie;
+        document.getElementById("compInventarioIne").value = compToEdit.inventarioIne || "";
+        document.getElementById("compEstado").value = compToEdit.estado;
+        document.getElementById("compNotas").value = compToEdit.notas || "";
+
+        currentCompPhoto = compToEdit.foto || "";
+        if (compToEdit.foto) {
+            document.getElementById("compPhotoImg").src = compToEdit.foto;
+            document.getElementById("compPhotoPreview").classList.remove("d-none");
+        }
+    } else {
+        document.getElementById("editCompId").value = "";
+        document.getElementById("compModalTitle").innerHTML = context === "op"
+            ? `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estación`
+            : `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en Estación`;
+    }
+
+    applyModalBrandLockState();
+    new bootstrap.Modal(document.getElementById("componentModal")).show();
+}
+
+async function saveComponentFromModal(e) {
+    e.preventDefault();
+    const ctx = document.getElementById("compFormContext").value;
+    const isOp = ctx === "op" && currentUser && currentUser.role === "operator";
+
+    const editId = document.getElementById("editCompId").value;
+    const modulo = isOp ? currentUser.modulo : document.getElementById("compModulo").value;
+    const estacion = isOp ? Number(currentUser.estacion) : Number(document.getElementById("compEstacion").value);
+    const tipo = document.getElementById("compTipo").value;
+    const marca = document.getElementById("compMarca").value;
+    const modelo = document.getElementById("compModelo").value.trim();
+    const serie = document.getElementById("compSerie").value.trim().toUpperCase();
+    const inventarioIne = document.getElementById("compInventarioIne").value.trim().toUpperCase();
+    const estado = document.getElementById("compEstado").value;
+    const notas = document.getElementById("compNotas").value.trim();
+
+    const dup = appState.components.find(c => c.serie === serie && c.id !== editId);
+    if (dup) {
+        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
+        return;
+    }
+
+    if (editId) {
+        const idx = appState.components.findIndex(c => c.id === editId);
+        if (idx !== -1) {
+            appState.components[idx] = {
+                ...appState.components[idx],
+                modulo, estacion, tipo, marca, modelo, serie, inventarioIne, estado, notas,
+                foto: currentCompPhoto || appState.components[idx].foto,
+                registradoPor: isOp ? currentUser.operator.nombre : (appState.components[idx].registradoPor || "Administrador")
+            };
+        }
+    } else {
+        appState.components.push({
+            id: "CMP-" + Date.now(),
+            modulo,
+            estacion,
+            tipo,
+            marca,
+            modelo,
+            serie,
+            inventarioIne,
+            estado,
+            notas,
+            foto: currentCompPhoto,
+            registradoPor: isOp ? currentUser.operator.nombre : "Administrador",
+            fechaRegistro: new Date().toLocaleString("es-MX")
+        });
+    }
+
+    await saveState();
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById("componentModal"));
+    if (modalInstance) modalInstance.hide();
+
+    if (isOp) refreshOperatorUI();
+    else refreshAdminUI({ preserveSelection: true });
+}
+
+// ==================== RENDERIZADO AGRUPADO POR COMPONENTE ====================
+function groupComponentsByType(list) {
+    const map = new Map();
+    list.forEach(c => {
+        const key = c.tipo || "Sin Tipo";
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(c);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "es"));
+}
+
+function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
+    if (!items.length) {
+        return `<div class="text-center text-muted py-4">No hay componentes registrados en este filtro.</div>`;
+    }
+
+    const groups = groupComponentsByType(items);
+    return groups.map(([groupName, groupItems]) => `
+        <div class="border rounded-3 mb-3 overflow-hidden bg-white">
+            <div class="bg-light px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark"><i class="bi bi-cpu text-danger me-2"></i>${groupName}</span>
+                <span class="badge bg-secondary">${groupItems.length}</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Foto</th>
+                            ${showLocation ? `<th>Módulo / Estación</th><th>Operador / Resp.</th>` : ""}
+                            <th>Marca y Modelo</th>
+                            <th>N° Serie / Inv. INE</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${groupItems.map(c => {
+                            const op = getOperatorByStation(c.modulo, c.estacion);
+                            const isServer = Number(c.estacion) === 0;
+                            const isNA = c.estado === "No Aplica" || c.marca === "NO APLICA";
+                            return `
+                                <tr>
+                                    <td>
+                                        ${c.foto
+                                            ? `<img src="${c.foto}" class="img-thumb" onclick="showPhotoModal('${c.foto}', '${c.tipo} - ${c.serie}')">`
+                                            : `<span class="badge bg-light text-muted border">Sin foto</span>`}
+                                    </td>
+                                    ${showLocation ? `
+                                        <td>
+                                            <span class="badge bg-dark">Mód. ${c.modulo}</span><br>
+                                            <small class="fw-bold ${isServer ? "text-primary" : ""}">${formatStationLabel(c.estacion)}</small>
+                                        </td>
+                                        <td class="small">
+                                            ${op
+                                                ? `<strong>${op.nombre}</strong>${isServer ? `<br><span class="badge bg-info-subtle text-dark border">Resp. Módulo</span>` : ""}`
+                                                : `<span class="text-danger">${isServer ? "Sin responsable" : "Sin asignar"}</span>`}
+                                        </td>
+                                    ` : ""}
+                                    <td>
+                                        <strong>${c.marca}</strong> <span class="text-muted">${c.modelo}</span>
+                                        ${c.notas ? `<div class="small text-muted">${c.notas}</div>` : ""}
+                                    </td>
+                                    <td>
+                                        <span class="font-monospace fw-bold bg-light px-2 py-1 rounded border">${c.serie}</span>
+                                        ${c.inventarioIne ? `<div class="small text-secondary mt-1">Inv. INE: <strong>${c.inventarioIne}</strong></div>` : ""}
+                                    </td>
+                                    <td>${getStatusBadge(c.estado)}</td>
+                                    <td class="text-end">
+                                        <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                            <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="editComponentById('${c.id}')">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" title="Eliminar" onclick="deleteComponent('${c.id}')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            ${!isNA ? `
+                                                <button class="btn btn-sm btn-outline-danger fw-semibold" onclick="openReportFaultModal('${c.id}')">
+                                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>Falla
+                                                </button>
+                                            ` : ""}
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join("")}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `).join("");
+}
+
+function editComponentById(id) {
+    const c = appState.components.find(item => item.id === id);
+    if (!c) return;
+    const ctx = currentUser && currentUser.role === "operator" ? "op" : "admin";
+    openComponentModal(ctx, c);
 }
 
 // ==================== SINCRONIZACIÓN FIRESTORE EN TIEMPO REAL ====================
@@ -317,7 +538,6 @@ function previewImageFile(event, previewDivId, imgId, targetVarName) {
             const compressed = canvas.toDataURL("image/jpeg", 0.72);
 
             if (targetVarName === "currentCompPhoto") currentCompPhoto = compressed;
-            if (targetVarName === "currentOpCompPhoto") currentOpCompPhoto = compressed;
             if (targetVarName === "currentOpPhoto") currentOpPhoto = compressed;
             if (targetVarName === "currentFaultPhoto") currentFaultPhoto = compressed;
 
@@ -333,7 +553,6 @@ function clearImageField(inputId, previewDivId, targetVarName) {
     document.getElementById(inputId).value = "";
     document.getElementById(previewDivId).classList.add("d-none");
     if (targetVarName === "currentCompPhoto") currentCompPhoto = "";
-    if (targetVarName === "currentOpCompPhoto") currentOpCompPhoto = "";
     if (targetVarName === "currentOpPhoto") currentOpPhoto = "";
     if (targetVarName === "currentFaultPhoto") currentFaultPhoto = "";
 }
@@ -475,115 +694,6 @@ function switchOpTab(tab) {
     document.getElementById("opSectionFallas").classList.toggle("d-none", tab !== "fallas");
 }
 
-function populateOperatorFormDropdowns() {
-    const brandSel = document.getElementById("opCompMarca");
-    const currBrand = brandSel.value;
-    const brandsList = appState.brands.includes("NO APLICA") ? appState.brands : ["NO APLICA", ...appState.brands];
-    brandSel.innerHTML = brandsList.map(b => `<option value="${b}">${b}</option>`).join("");
-    if (currBrand && brandsList.includes(currBrand)) brandSel.value = currBrand;
-
-    const typeSel = document.getElementById("opCompTipo");
-    const currType = typeSel.value;
-    typeSel.innerHTML = appState.types.map(t => `<option value="${t}">${t}</option>`).join("");
-    if (currType && appState.types.includes(currType)) typeSel.value = currType;
-}
-
-async function saveOperatorComponent(e) {
-    e.preventDefault();
-    if (!currentUser || currentUser.role !== "operator") return;
-
-    const editId = document.getElementById("opEditCompId").value;
-    const modulo = currentUser.modulo;
-    const estacion = Number(currentUser.estacion);
-    const tipo = document.getElementById("opCompTipo").value;
-    const marca = document.getElementById("opCompMarca").value;
-    const modelo = document.getElementById("opCompModelo").value.trim();
-    const serie = document.getElementById("opCompSerie").value.trim().toUpperCase();
-    const inventarioIne = document.getElementById("opCompInventarioIne").value.trim().toUpperCase();
-    const estado = document.getElementById("opCompEstado").value;
-    const notas = document.getElementById("opCompNotas").value.trim();
-
-    const dup = appState.components.find(c => c.serie === serie && c.id !== editId);
-    if (dup) {
-        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
-        return;
-    }
-
-    if (editId) {
-        const idx = appState.components.findIndex(c => c.id === editId && c.modulo === modulo && Number(c.estacion) === estacion);
-        if (idx !== -1) {
-            appState.components[idx] = {
-                ...appState.components[idx],
-                tipo, marca, modelo, serie, inventarioIne, estado, notas,
-                foto: currentOpCompPhoto || appState.components[idx].foto,
-                registradoPor: currentUser.operator.nombre
-            };
-        }
-    } else {
-        appState.components.push({
-            id: "CMP-" + Date.now(),
-            modulo,
-            estacion,
-            tipo,
-            marca,
-            modelo,
-            serie,
-            inventarioIne,
-            estado,
-            notas,
-            foto: currentOpCompPhoto,
-            registradoPor: currentUser.operator.nombre,
-            fechaRegistro: new Date().toLocaleString("es-MX")
-        });
-    }
-
-    await saveState();
-    resetOpComponentForm();
-    refreshOperatorUI();
-}
-
-function editOperatorComponent(id) {
-    if (!currentUser || currentUser.role !== "operator") return;
-    const c = appState.components.find(item => item.id === id && item.modulo === currentUser.modulo && Number(item.estacion) === Number(currentUser.estacion));
-    if (!c) return;
-
-    populateOperatorFormDropdowns();
-    document.getElementById("opEditCompId").value = c.id;
-    document.getElementById("opCompTipo").value = c.tipo;
-    const opMarcaSel = document.getElementById("opCompMarca");
-    if (![...opMarcaSel.options].some(o => o.value === c.marca)) {
-        opMarcaSel.innerHTML = `<option value="${c.marca}">${c.marca}</option>` + opMarcaSel.innerHTML;
-    }
-    opMarcaSel.value = c.marca;
-    document.getElementById("opCompModelo").value = c.modelo;
-    document.getElementById("opCompSerie").value = c.serie;
-    document.getElementById("opCompInventarioIne").value = c.inventarioIne || "";
-    document.getElementById("opCompEstado").value = c.estado === "Baja" ? "En Revisión" : c.estado;
-    document.getElementById("opCompNotas").value = c.notas || "";
-
-    currentOpCompPhoto = c.foto || "";
-    if (c.foto) {
-        document.getElementById("opCompPhotoImg").src = c.foto;
-        document.getElementById("opCompPhotoPreview").classList.remove("d-none");
-    } else {
-        document.getElementById("opCompPhotoPreview").classList.add("d-none");
-    }
-
-    applyBrandLockState("op");
-    document.getElementById("opCompFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente`;
-    document.getElementById("btnOpCancelEditComp").classList.remove("d-none");
-}
-
-function resetOpComponentForm() {
-    document.getElementById("opComponentForm").reset();
-    document.getElementById("opEditCompId").value = "";
-    clearImageField("opCompFotoInput", "opCompPhotoPreview", "currentOpCompPhoto");
-    document.getElementById("opCompFormTitle").innerHTML = `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estación`;
-    document.getElementById("btnOpCancelEditComp").classList.add("d-none");
-    populateOperatorFormDropdowns();
-    applyBrandLockState("op");
-}
-
 function refreshOperatorUI() {
     const { modulo, estacion, operator } = currentUser;
     document.getElementById("opCardPhoto").src = operator.foto || DEFAULT_AVATAR;
@@ -593,47 +703,9 @@ function refreshOperatorUI() {
     document.getElementById("opCardPhone").textContent = operator.telefono;
     document.getElementById("opCardEmail").textContent = operator.correo;
 
-    populateOperatorFormDropdowns();
-    applyBrandLockState("op");
-
     const myComps = appState.components.filter(c => c.modulo === modulo && Number(c.estacion) === Number(estacion));
     document.getElementById("opTotalComponents").textContent = `${myComps.length} equipos`;
-
-    const tbody = document.getElementById("opComponentsTableBody");
-    if (myComps.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Aún no has registrado componentes en esta estación. Usa el formulario para agregarlos.</td></tr>`;
-    } else {
-        tbody.innerHTML = myComps.map(c => {
-            const isNA = c.estado === "No Aplica" || c.marca === "NO APLICA";
-            return `
-            <tr>
-                <td>
-                    ${c.foto
-                        ? `<img src="${c.foto}" class="img-thumb" onclick="showPhotoModal('${c.foto}', '${c.tipo} - ${c.serie}')">`
-                        : `<span class="badge bg-light text-muted border">Sin foto</span>`}
-                </td>
-                <td class="fw-bold">${c.tipo}</td>
-                <td>${c.marca} <span class="text-muted">${c.modelo}</span></td>
-                <td>
-                    <span class="font-monospace fw-semibold bg-light px-2 py-1 rounded border">${c.serie}</span>
-                    ${c.inventarioIne ? `<div class="small text-secondary mt-1">Inv. INE: <strong>${c.inventarioIne}</strong></div>` : ""}
-                </td>
-                <td>${getStatusBadge(c.estado)}</td>
-                <td class="text-end">
-                    <div class="d-flex justify-content-end gap-1 flex-wrap">
-                        <button class="btn btn-sm btn-outline-primary" title="Editar componente" onclick="editOperatorComponent('${c.id}')">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        ${!isNA ? `
-                            <button class="btn btn-sm btn-outline-danger fw-semibold" onclick="openReportFaultModal('${c.id}')">
-                                <i class="bi bi-exclamation-triangle-fill me-1"></i>Reportar Falla
-                            </button>
-                        ` : ""}
-                    </div>
-                </td>
-            </tr>
-        `}).join("");
-    }
+    document.getElementById("opGroupedComponentsContainer").innerHTML = renderGroupedCardsHtml(myComps, { showLocation: false });
 
     const myFaults = appState.faults.filter(f => f.modulo === modulo && Number(f.estacion) === Number(estacion));
     const activeMyFaults = myFaults.filter(f => f.estatus !== "Finalizada");
@@ -704,41 +776,22 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
     document.getElementById("cfg-050353").value = appState.stations["050353"] ?? 0;
     document.getElementById("cfg-050354").value = appState.stations["050354"] ?? 0;
 
-    const compModVal = preserveSelection ? document.getElementById("compModulo").value : "050351";
-    const compEstVal = preserveSelection ? document.getElementById("compEstacion").value : 0;
-
     const opModVal = preserveSelection ? document.getElementById("opRegModulo").value : "050351";
     const opEstVal = preserveSelection ? document.getElementById("opRegEstacion").value : 0;
 
-    populateDropdowns();
-
-    document.getElementById("compModulo").value = compModVal;
-    fillStationOptions(document.getElementById("compEstacion"), compModVal, { selectedValue: compEstVal });
-    updateCompAssignedOperatorHint();
-    applyBrandLockState("admin");
+    populateFilterDropdown();
 
     document.getElementById("opRegModulo").value = opModVal;
     fillStationOptions(document.getElementById("opRegEstacion"), opModVal, { includeRoleHint: true, selectedValue: opEstVal });
     updateOpRoleHint();
 
-    renderAdminInventoryTable();
+    renderAdminInventoryGrouped();
     renderOperatorsTable();
     renderCatalogs();
     renderAdminFaultsTable();
 }
 
-function populateDropdowns() {
-    const brandSel = document.getElementById("compMarca");
-    const currBrand = brandSel.value;
-    const brandsList = appState.brands.includes("NO APLICA") ? appState.brands : ["NO APLICA", ...appState.brands];
-    brandSel.innerHTML = brandsList.map(b => `<option value="${b}">${b}</option>`).join("");
-    if (currBrand && brandsList.includes(currBrand)) brandSel.value = currBrand;
-
-    const typeSel = document.getElementById("compTipo");
-    const currType = typeSel.value;
-    typeSel.innerHTML = appState.types.map(t => `<option value="${t}">${t}</option>`).join("");
-    if (currType && appState.types.includes(currType)) typeSel.value = currType;
-
+function populateFilterDropdown() {
     const filterType = document.getElementById("adminFilterTipo");
     const currFilter = filterType.value;
     filterType.innerHTML = `<option value="ALL">Todos los Componentes</option>` +
@@ -750,7 +803,12 @@ function onAdminCompModuloChange() {
     const modulo = document.getElementById("compModulo").value;
     fillStationOptions(document.getElementById("compEstacion"), modulo, { selectedValue: 0 });
     updateCompAssignedOperatorHint();
-    applyBrandLockState("admin");
+    applyModalBrandLockState();
+}
+
+function onAdminStationOrBrandChange() {
+    updateCompAssignedOperatorHint();
+    applyModalBrandLockState();
 }
 
 function updateCompAssignedOperatorHint() {
@@ -768,116 +826,15 @@ function updateCompAssignedOperatorHint() {
     }
 }
 
-async function saveComponent(e) {
-    e.preventDefault();
-    const editId = document.getElementById("editCompId").value;
-    const modulo = document.getElementById("compModulo").value;
-    const estacion = Number(document.getElementById("compEstacion").value);
-    const tipo = document.getElementById("compTipo").value;
-    const marca = document.getElementById("compMarca").value;
-    const modelo = document.getElementById("compModelo").value.trim();
-    const serie = document.getElementById("compSerie").value.trim().toUpperCase();
-    const inventarioIne = document.getElementById("compInventarioIne").value.trim().toUpperCase();
-    const estado = document.getElementById("compEstado").value;
-    const notas = document.getElementById("compNotas").value.trim();
-
-    const dup = appState.components.find(c => c.serie === serie && c.id !== editId);
-    if (dup) {
-        alert(`El número de serie "${serie}" ya está registrado en el Módulo ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
-        return;
-    }
-
-    if (editId) {
-        const idx = appState.components.findIndex(c => c.id === editId);
-        if (idx !== -1) {
-            appState.components[idx] = {
-                ...appState.components[idx],
-                modulo, estacion, tipo, marca, modelo, serie, inventarioIne, estado, notas,
-                foto: currentCompPhoto || appState.components[idx].foto
-            };
-        }
-    } else {
-        appState.components.push({
-            id: "CMP-" + Date.now(),
-            modulo,
-            estacion,
-            tipo,
-            marca,
-            modelo,
-            serie,
-            inventarioIne,
-            estado,
-            notas,
-            foto: currentCompPhoto,
-            registradoPor: "Administrador",
-            fechaRegistro: new Date().toLocaleString("es-MX")
-        });
-    }
-
-    await saveState();
-    resetComponentForm({ keepModulo: modulo, keepEstacion: estacion });
-    refreshAdminUI({ preserveSelection: true });
-}
-
-function editComponent(id) {
-    const c = appState.components.find(item => item.id === id);
-    if (!c) return;
-    switchAdminTab("inventario");
-    document.getElementById("editCompId").value = c.id;
-    document.getElementById("compModulo").value = c.modulo;
-    fillStationOptions(document.getElementById("compEstacion"), c.modulo, { selectedValue: c.estacion });
-    updateCompAssignedOperatorHint();
-    document.getElementById("compTipo").value = c.tipo;
-
-    const marcaSel = document.getElementById("compMarca");
-    if (![...marcaSel.options].some(o => o.value === c.marca)) {
-        marcaSel.innerHTML = `<option value="${c.marca}">${c.marca}</option>` + marcaSel.innerHTML;
-    }
-    marcaSel.value = c.marca;
-
-    document.getElementById("compModelo").value = c.modelo;
-    document.getElementById("compSerie").value = c.serie;
-    document.getElementById("compInventarioIne").value = c.inventarioIne || "";
-    document.getElementById("compEstado").value = c.estado;
-    document.getElementById("compNotas").value = c.notas || "";
-
-    currentCompPhoto = c.foto || "";
-    if (c.foto) {
-        document.getElementById("compPhotoImg").src = c.foto;
-        document.getElementById("compPhotoPreview").classList.remove("d-none");
-    } else {
-        document.getElementById("compPhotoPreview").classList.add("d-none");
-    }
-
-    applyBrandLockState("admin");
-    document.getElementById("compFormTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente`;
-    document.getElementById("btnCancelEditComp").classList.remove("d-none");
-}
-
-function resetComponentForm({ keepModulo = null, keepEstacion = null } = {}) {
-    const modToKeep = keepModulo ?? document.getElementById("compModulo").value;
-    const estToKeep = keepEstacion ?? 0;
-
-    document.getElementById("componentForm").reset();
-    document.getElementById("editCompId").value = "";
-    clearImageField("compFotoInput", "compPhotoPreview", "currentCompPhoto");
-    document.getElementById("compFormTitle").innerHTML = `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en Estación`;
-    document.getElementById("btnCancelEditComp").classList.add("d-none");
-
-    document.getElementById("compModulo").value = modToKeep;
-    fillStationOptions(document.getElementById("compEstacion"), modToKeep, { selectedValue: estToKeep });
-    updateCompAssignedOperatorHint();
-    applyBrandLockState("admin");
-}
-
 async function deleteComponent(id) {
     if (!confirm("¿Seguro que deseas eliminar este componente del inventario?")) return;
     appState.components = appState.components.filter(c => c.id !== id);
     await saveState();
-    refreshAdminUI({ preserveSelection: true });
+    if (currentUser && currentUser.role === "operator") refreshOperatorUI();
+    else refreshAdminUI({ preserveSelection: true });
 }
 
-function renderAdminInventoryTable() {
+function renderAdminInventoryGrouped() {
     const fMod = document.getElementById("adminFilterModulo").value;
     const fTipo = document.getElementById("adminFilterTipo").value;
     const search = document.getElementById("adminSearchInput").value.toLowerCase().trim();
@@ -895,49 +852,8 @@ function renderAdminInventoryTable() {
         return true;
     });
 
-    const tbody = document.getElementById("adminComponentsTableBody");
-    if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No hay componentes registrados con los filtros seleccionados.</td></tr>`;
-        return;
-    }
-
-    tbody.innerHTML = filtered.map(c => {
-        const op = getOperatorByStation(c.modulo, c.estacion);
-        const isServer = Number(c.estacion) === 0;
-        const isNA = c.estado === "No Aplica" || c.marca === "NO APLICA";
-        return `
-            <tr>
-                <td>
-                    ${c.foto
-                        ? `<img src="${c.foto}" class="img-thumb" onclick="showPhotoModal('${c.foto}', '${c.tipo} - ${c.serie}')">`
-                        : `<span class="badge bg-light text-muted border">Sin foto</span>`}
-                </td>
-                <td>
-                    <span class="badge bg-dark">Mód. ${c.modulo}</span><br>
-                    <small class="fw-bold ${isServer ? "text-primary" : ""}">${formatStationLabel(c.estacion)}</small>
-                </td>
-                <td class="small">
-                    ${op
-                        ? `<strong>${op.nombre}</strong>${isServer ? `<br><span class="badge bg-info-subtle text-dark border">Resp. Módulo</span>` : ""}`
-                        : `<span class="text-danger">${isServer ? "Sin responsable" : "Sin asignar"}</span>`}
-                </td>
-                <td class="fw-semibold">${c.tipo}</td>
-                <td>${c.marca} <span class="text-muted">${c.modelo}</span></td>
-                <td>
-                    <span class="font-monospace fw-bold">${c.serie}</span>
-                    ${c.inventarioIne ? `<div class="small text-secondary">Inv. INE: <strong>${c.inventarioIne}</strong></div>` : ""}
-                </td>
-                <td>${getStatusBadge(c.estado)}</td>
-                <td class="text-end">
-                    <div class="btn-group btn-group-sm">
-                        ${!isNA ? `<button class="btn btn-outline-danger" title="Levantar Falla" onclick="openReportFaultModal('${c.id}')"><i class="bi bi-exclamation-triangle"></i></button>` : ""}
-                        <button class="btn btn-outline-primary" title="Editar" onclick="editComponent('${c.id}')"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-outline-secondary" title="Eliminar" onclick="deleteComponent('${c.id}')"><i class="bi bi-trash"></i></button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join("");
+    document.getElementById("adminGroupedComponentsContainer").innerHTML =
+        renderGroupedCardsHtml(filtered, { showLocation: true });
 }
 
 // ==================== GESTIÓN DE OPERADORES (MAC DISTRITO 03) ====================
@@ -1699,19 +1615,16 @@ Object.assign(window, {
     loginAsAdmin,
     logout,
     switchOpTab,
-    onBrandOrTypeChange,
-    saveOperatorComponent,
-    editOperatorComponent,
-    resetOpComponentForm,
+    openComponentModal,
+    saveComponentFromModal,
+    onModalBrandOrTypeChange,
+    editComponentById,
     switchAdminTab,
     onAdminCompModuloChange,
     onAdminStationOrBrandChange,
     updateCompAssignedOperatorHint,
-    saveComponent,
-    editComponent,
-    resetComponentForm,
     deleteComponent,
-    renderAdminInventoryTable,
+    renderAdminInventoryGrouped,
     onOpRegModuloChange,
     updateOpRoleHint,
     saveOperator,
