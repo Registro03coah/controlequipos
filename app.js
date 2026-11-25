@@ -42,23 +42,45 @@ let currentCompPhoto = "";
 let currentOpPhoto = "";
 let currentFaultPhoto = "";
 
+// ==================== HELPERS DE "NO APLICA" ====================
+function isNoAplicaComponent(comp) {
+    if (!comp) return false;
+    const estado = String(comp.estado_fisico || comp.estado || "").trim().toLowerCase();
+    const marca = String(comp.marca || "").trim().toUpperCase();
+    const serie = String(comp.numero_serie || comp.serie || "").trim().toUpperCase();
+    return estado === "no aplica" || marca === "NO APLICA" || serie === "NO APLICA" || serie.startsWith("NA-");
+}
+
+function countRealComponents(list = []) {
+    return list.filter(c => !isNoAplicaComponent(c)).length;
+}
+
 // ==================== MIGRACIÓN A NOMBRES NORMALIZADOS ====================
 function normalizeComponentRecord(raw = {}) {
+    const estadoRaw = String(raw.estado_fisico ?? raw.estado ?? "Operativo").trim();
+    const marcaRaw = String(raw.marca ?? "Generico").trim();
+    const serieRaw = String(raw.numero_serie ?? raw.serie ?? "").trim().toUpperCase();
+    const isNA =
+        estadoRaw.toLowerCase() === "no aplica" ||
+        marcaRaw.toUpperCase() === "NO APLICA" ||
+        serieRaw === "NO APLICA" ||
+        serieRaw.startsWith("NA-");
+
     return {
         id: String(raw.id || "CMP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
         modulo: String(raw.modulo || "050351").padStart(6, "0"),
         estacion: Number(raw.estacion ?? 0),
         tipo_componente: String(raw.tipo_componente ?? raw.tipo ?? "Computadora / CPU").trim(),
-        marca: String(raw.marca ?? "Generico").trim(),
-        modelo: String(raw.modelo ?? "").trim(),
-        numero_serie: String(raw.numero_serie ?? raw.serie ?? "").trim().toUpperCase(),
-        inventario_ine: String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
-        serie_cpu_vinculada: String(raw.serie_cpu_vinculada ?? raw.serieCpuVinculada ?? "").trim().toUpperCase(),
-        serie_lente: String(raw.serie_lente ?? raw.serieLente ?? "").trim().toUpperCase(),
-        serie_docking: String(raw.serie_docking ?? raw.serieDocking ?? "").trim().toUpperCase(),
-        estado_fisico: String(raw.estado_fisico ?? raw.estado ?? "Operativo").trim(),
-        observaciones: String(raw.observaciones ?? raw.notas ?? "").trim(),
-        foto_url: String(raw.foto_url ?? raw.foto ?? ""),
+        marca: isNA ? "NO APLICA" : marcaRaw,
+        modelo: isNA ? "NO APLICA" : String(raw.modelo ?? "").trim(),
+        numero_serie: isNA ? "NO APLICA" : serieRaw,
+        inventario_ine: isNA ? "" : String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
+        serie_cpu_vinculada: isNA ? "" : String(raw.serie_cpu_vinculada ?? raw.serieCpuVinculada ?? "").trim().toUpperCase(),
+        serie_lente: isNA ? "" : String(raw.serie_lente ?? raw.serieLente ?? "").trim().toUpperCase(),
+        serie_docking: isNA ? "" : String(raw.serie_docking ?? raw.serieDocking ?? "").trim().toUpperCase(),
+        estado_fisico: isNA ? "No Aplica" : estadoRaw,
+        observaciones: isNA ? "" : String(raw.observaciones ?? raw.notas ?? "").trim(),
+        foto_url: isNA ? "" : String(raw.foto_url ?? raw.foto ?? ""),
         registrado_por: String(raw.registrado_por ?? raw.registradoPor ?? "Administrador").trim(),
         fecha_registro: String(raw.fecha_registro ?? raw.fechaRegistro ?? new Date().toLocaleString("es-MX"))
     };
@@ -170,6 +192,7 @@ function isLaptopType(tipo) {
 
 function getAvailableCpusForStation(modulo, estacion) {
     return appState.componentes.filter(c =>
+        !isNoAplicaComponent(c) &&
         c.modulo === String(modulo).padStart(6, "0") &&
         Number(c.estacion) === Number(estacion) &&
         isCpuType(c.tipo_componente)
@@ -178,13 +201,14 @@ function getAvailableCpusForStation(modulo, estacion) {
 
 function updateCpuLinkSelector(currentSerieValue = "") {
     const tipo = document.getElementById("compTipo").value;
+    const isNA = document.getElementById("compMarca").value === "NO APLICA";
     const container = document.getElementById("compCpuLinkContainer");
     const selectEl = document.getElementById("compCpuSelect");
     const inputEl = document.getElementById("compSerieCpuVinculada");
 
     if (!container || !selectEl || !inputEl) return;
 
-    if (!isMonitorType(tipo)) {
+    if (!isMonitorType(tipo) || isNA) {
         container.classList.add("d-none");
         selectEl.innerHTML = `<option value="">-- Seleccionar CPU registrado --</option>`;
         inputEl.value = "";
@@ -223,12 +247,13 @@ function onCompCpuSelectChange() {
 
 function updateLensFieldVisibility(currentLensValue = "") {
     const tipo = document.getElementById("compTipo").value;
+    const isNA = document.getElementById("compMarca").value === "NO APLICA";
     const container = document.getElementById("compLensLinkContainer");
     const inputEl = document.getElementById("compSerieLente");
 
     if (!container || !inputEl) return;
 
-    if (!isCameraType(tipo)) {
+    if (!isCameraType(tipo) || isNA) {
         container.classList.add("d-none");
         inputEl.value = "";
         return;
@@ -243,12 +268,13 @@ function updateLensFieldVisibility(currentLensValue = "") {
 
 function updateDockingFieldVisibility(currentDockingValue = "") {
     const tipo = document.getElementById("compTipo").value;
+    const isNA = document.getElementById("compMarca").value === "NO APLICA";
     const container = document.getElementById("compDockingLinkContainer");
     const inputEl = document.getElementById("compSerieDocking");
 
     if (!container || !inputEl) return;
 
-    if (!isLaptopType(tipo)) {
+    if (!isLaptopType(tipo) || isNA) {
         container.classList.add("d-none");
         inputEl.value = "";
         return;
@@ -348,44 +374,29 @@ function populateModalDropdowns() {
 function applyModalBrandLockState() {
     const marca = document.getElementById("compMarca").value;
     const isNoAplica = marca === "NO APLICA";
-    const ctx = document.getElementById("compFormContext").value;
 
     const modeloEl = document.getElementById("compModelo");
     const serieEl = document.getElementById("compSerie");
     const invIneEl = document.getElementById("compInventarioIne");
     const estadoEl = document.getElementById("compEstado");
+    const notasEl = document.getElementById("compNotas");
     const scanBtnEl = document.getElementById("btnCompScanSerie");
 
     modeloEl.disabled = isNoAplica;
     serieEl.disabled = isNoAplica;
     invIneEl.disabled = isNoAplica;
+    if (notasEl) notasEl.disabled = isNoAplica;
     if (scanBtnEl) scanBtnEl.disabled = isNoAplica;
 
     if (isNoAplica) {
-        const modulo = ctx === "op" && currentUser ? currentUser.modulo : document.getElementById("compModulo").value;
-        const estacion = ctx === "op" && currentUser ? Number(currentUser.estacion) : Number(document.getElementById("compEstacion").value);
-        const tipo = document.getElementById("compTipo").value;
-        const editId = document.getElementById("editCompId").value;
-
         modeloEl.value = "NO APLICA";
-        invIneEl.value = "NO APLICA";
+        serieEl.value = "NO APLICA";
+        invIneEl.value = "";
         estadoEl.value = "No Aplica";
-
-        const tag = tipo
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^A-Za-z0-9]/g, "")
-            .toUpperCase()
-            .slice(0, 12);
-
-        let serieCandidate = `NA-${modulo}-E${estacion}-${tag}`;
-        if (appState.componentes.some(c => c.numero_serie === serieCandidate && c.id !== editId)) {
-            serieCandidate = `${serieCandidate}-${Date.now().toString().slice(-3)}`;
-        }
-        serieEl.value = serieCandidate;
+        if (notasEl) notasEl.value = "";
     } else {
         if (modeloEl.value === "NO APLICA") modeloEl.value = "";
-        if (invIneEl.value === "NO APLICA") invIneEl.value = "";
-        if (serieEl.value.startsWith("NA-")) serieEl.value = "";
+        if (serieEl.value === "NO APLICA" || serieEl.value.startsWith("NA-")) serieEl.value = "";
         if (estadoEl.value === "No Aplica") estadoEl.value = "Operativo";
     }
 }
@@ -416,35 +427,37 @@ function openComponentModal(context = "admin", compToEdit = null) {
     }
 
     if (compToEdit) {
+        const isNA = isNoAplicaComponent(compToEdit);
         document.getElementById("editCompId").value = compToEdit.id;
         document.getElementById("compModalTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Componente`;
         document.getElementById("compTipo").value = compToEdit.tipo_componente;
 
         const marcaSel = document.getElementById("compMarca");
-        if (![...marcaSel.options].some(o => o.value === compToEdit.marca)) {
-            marcaSel.innerHTML = `<option value="${compToEdit.marca}">${compToEdit.marca}</option>` + marcaSel.innerHTML;
+        const marcaVal = isNA ? "NO APLICA" : compToEdit.marca;
+        if (![...marcaSel.options].some(o => o.value === marcaVal)) {
+            marcaSel.innerHTML = `<option value="${marcaVal}">${marcaVal}</option>` + marcaSel.innerHTML;
         }
-        marcaSel.value = compToEdit.marca;
+        marcaSel.value = marcaVal;
 
-        document.getElementById("compModelo").value = compToEdit.modelo;
-        document.getElementById("compSerie").value = compToEdit.numero_serie;
-        document.getElementById("compInventarioIne").value = compToEdit.inventario_ine || "";
+        document.getElementById("compModelo").value = isNA ? "NO APLICA" : compToEdit.modelo;
+        document.getElementById("compSerie").value = isNA ? "NO APLICA" : compToEdit.numero_serie;
+        document.getElementById("compInventarioIne").value = isNA ? "" : (compToEdit.inventario_ine || "");
 
         const cpuInput = document.getElementById("compSerieCpuVinculada");
-        if (cpuInput) cpuInput.value = compToEdit.serie_cpu_vinculada || "";
+        if (cpuInput) cpuInput.value = isNA ? "" : (compToEdit.serie_cpu_vinculada || "");
 
         const lensInput = document.getElementById("compSerieLente");
-        if (lensInput) lensInput.value = compToEdit.serie_lente || "";
+        if (lensInput) lensInput.value = isNA ? "" : (compToEdit.serie_lente || "");
 
         const dockingInput = document.getElementById("compSerieDocking");
-        if (dockingInput) dockingInput.value = compToEdit.serie_docking || "";
+        if (dockingInput) dockingInput.value = isNA ? "" : (compToEdit.serie_docking || "");
 
-        document.getElementById("compEstado").value = compToEdit.estado_fisico;
-        document.getElementById("compNotas").value = compToEdit.observaciones || "";
+        document.getElementById("compEstado").value = isNA ? "No Aplica" : compToEdit.estado_fisico;
+        document.getElementById("compNotas").value = isNA ? "" : (compToEdit.observaciones || "");
 
-        currentCompPhoto = compToEdit.foto_url || "";
-        if (compToEdit.foto_url) {
-            document.getElementById("compPhotoImg").src = compToEdit.foto_url;
+        currentCompPhoto = isNA ? "" : (compToEdit.foto_url || "");
+        if (currentCompPhoto) {
+            document.getElementById("compPhotoImg").src = currentCompPhoto;
             document.getElementById("compPhotoPreview").classList.remove("d-none");
         }
     } else {
@@ -462,9 +475,9 @@ function openComponentModal(context = "admin", compToEdit = null) {
     }
 
     applyModalBrandLockState();
-    updateCpuLinkSelector(compToEdit ? compToEdit.serie_cpu_vinculada : "");
-    updateLensFieldVisibility(compToEdit ? compToEdit.serie_lente : "");
-    updateDockingFieldVisibility(compToEdit ? compToEdit.serie_docking : "");
+    updateCpuLinkSelector(compToEdit && !isNoAplicaComponent(compToEdit) ? compToEdit.serie_cpu_vinculada : "");
+    updateLensFieldVisibility(compToEdit && !isNoAplicaComponent(compToEdit) ? compToEdit.serie_lente : "");
+    updateDockingFieldVisibility(compToEdit && !isNoAplicaComponent(compToEdit) ? compToEdit.serie_docking : "");
     new bootstrap.Modal(document.getElementById("componentModal")).show();
 }
 
@@ -478,25 +491,30 @@ async function saveComponentFromModal(e) {
     const estacion = isOp ? Number(currentUser.estacion) : Number(document.getElementById("compEstacion").value);
     const tipo_componente = document.getElementById("compTipo").value;
     const marca = document.getElementById("compMarca").value;
-    const modelo = document.getElementById("compModelo").value.trim();
-    const numero_serie = document.getElementById("compSerie").value.trim().toUpperCase();
-    const inventario_ine = document.getElementById("compInventarioIne").value.trim().toUpperCase();
-    const serie_cpu_vinculada = isMonitorType(tipo_componente)
+    const estadoRaw = document.getElementById("compEstado").value;
+    const isNA = marca === "NO APLICA" || estadoRaw === "No Aplica";
+
+    const modelo = isNA ? "NO APLICA" : document.getElementById("compModelo").value.trim();
+    const numero_serie = isNA ? "NO APLICA" : document.getElementById("compSerie").value.trim().toUpperCase();
+    const inventario_ine = isNA ? "" : document.getElementById("compInventarioIne").value.trim().toUpperCase();
+    const serie_cpu_vinculada = (!isNA && isMonitorType(tipo_componente))
         ? (document.getElementById("compSerieCpuVinculada")?.value || "").trim().toUpperCase()
         : "";
-    const serie_lente = isCameraType(tipo_componente)
+    const serie_lente = (!isNA && isCameraType(tipo_componente))
         ? (document.getElementById("compSerieLente")?.value || "").trim().toUpperCase()
         : "";
-    const serie_docking = isLaptopType(tipo_componente)
+    const serie_docking = (!isNA && isLaptopType(tipo_componente))
         ? (document.getElementById("compSerieDocking")?.value || "").trim().toUpperCase()
         : "";
-    const estado_fisico = document.getElementById("compEstado").value;
-    const observaciones = document.getElementById("compNotas").value.trim();
+    const estado_fisico = isNA ? "No Aplica" : estadoRaw;
+    const observaciones = isNA ? "" : document.getElementById("compNotas").value.trim();
 
-    const dup = appState.componentes.find(c => c.numero_serie === numero_serie && c.id !== editId);
-    if (dup) {
-        alert(`El numero de serie "${numero_serie}" ya esta registrado en ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
-        return;
+    if (!isNA) {
+        const dup = appState.componentes.find(c => !isNoAplicaComponent(c) && c.numero_serie === numero_serie && c.id !== editId);
+        if (dup) {
+            alert(`El numero de serie "${numero_serie}" ya esta registrado en ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
+            return;
+        }
     }
 
     if (editId) {
@@ -507,7 +525,7 @@ async function saveComponentFromModal(e) {
                 modulo,
                 estacion,
                 tipo_componente,
-                marca,
+                marca: isNA ? "NO APLICA" : marca,
                 modelo,
                 numero_serie,
                 inventario_ine,
@@ -516,7 +534,7 @@ async function saveComponentFromModal(e) {
                 serie_docking,
                 estado_fisico,
                 observaciones,
-                foto_url: currentCompPhoto || appState.componentes[idx].foto_url,
+                foto_url: isNA ? "" : (currentCompPhoto || appState.componentes[idx].foto_url),
                 registrado_por: isOp ? currentUser.operator.nombre_completo : (appState.componentes[idx].registrado_por || "Administrador")
             });
         }
@@ -526,7 +544,7 @@ async function saveComponentFromModal(e) {
             modulo,
             estacion,
             tipo_componente,
-            marca,
+            marca: isNA ? "NO APLICA" : marca,
             modelo,
             numero_serie,
             inventario_ine,
@@ -535,7 +553,7 @@ async function saveComponentFromModal(e) {
             serie_docking,
             estado_fisico,
             observaciones,
-            foto_url: currentCompPhoto,
+            foto_url: isNA ? "" : currentCompPhoto,
             registrado_por: isOp ? currentUser.operator.nombre_completo : "Administrador",
             fecha_registro: new Date().toLocaleString("es-MX")
         }));
@@ -568,11 +586,12 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
     const groups = groupComponentsByType(items);
     return groups.map(([groupName, groupItems]) => {
         const iconClass = getComponentIcon(groupName);
+        const realCount = countRealComponents(groupItems);
         return `
         <div class="border rounded-3 mb-3 overflow-hidden bg-white">
             <div class="bg-light px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
                 <span class="fw-bold text-dark"><i class="bi ${iconClass} text-danger me-2"></i>${groupName}</span>
-                <span class="badge bg-secondary">${groupItems.length}</span>
+                <span class="badge ${realCount > 0 ? "bg-secondary" : "bg-light text-muted border"}">${realCount} ${realCount === 1 ? "equipo" : "equipos"}</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -591,11 +610,48 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                         ${groupItems.map(c => {
                             const op = getOperatorByStation(c.modulo, c.estacion);
                             const isServer = Number(c.estacion) === 0;
-                            const isNA = c.estado_fisico === "No Aplica" || c.marca === "NO APLICA";
+                            const isNA = isNoAplicaComponent(c);
                             const itemIcon = getComponentIcon(c.tipo_componente);
-                            const linkedMonitors = isCpuType(c.tipo_componente)
-                                ? appState.componentes.filter(m => isMonitorType(m.tipo_componente) && m.serie_cpu_vinculada === c.numero_serie)
+                            const linkedMonitors = (!isNA && isCpuType(c.tipo_componente))
+                                ? appState.componentes.filter(m => !isNoAplicaComponent(m) && isMonitorType(m.tipo_componente) && m.serie_cpu_vinculada === c.numero_serie)
                                 : [];
+
+                            if (isNA) {
+                                return `
+                                    <tr class="table-light text-muted">
+                                        <td><span class="badge bg-light text-muted border">—</span></td>
+                                        <td>
+                                            <i class="bi ${itemIcon} text-secondary me-1"></i>
+                                            <span class="text-secondary">${c.tipo_componente}</span>
+                                        </td>
+                                        ${showLocation ? `
+                                            <td>
+                                                <span class="badge bg-secondary">${c.modulo}</span><br>
+                                                <small class="${isServer ? "text-primary fw-semibold" : ""}">${formatStationLabel(c.estacion)}</small>
+                                            </td>
+                                            <td>
+                                                ${op
+                                                    ? `<span>${op.nombre_completo}</span>`
+                                                    : `<span class="text-muted">Sin asignar</span>`}
+                                            </td>
+                                        ` : ""}
+                                        <td><span class="fst-italic text-muted">No aplica (sin equipo)</span></td>
+                                        <td><span class="fst-italic text-muted">Sin serie ni datos</span></td>
+                                        <td><span class="badge bg-light text-secondary border">No Aplica</span></td>
+                                        <td class="text-end">
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <button class="btn btn-sm btn-outline-secondary" title="Editar" onclick="editComponentById('${c.id}')">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" title="Eliminar registro" onclick="deleteComponent('${c.id}')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }
+
                             return `
                                 <tr>
                                     <td>
@@ -646,11 +702,9 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                             <button class="btn btn-sm btn-outline-secondary" title="Eliminar" onclick="deleteComponent('${c.id}')">
                                                 <i class="bi bi-trash"></i>
                                             </button>
-                                            ${!isNA ? `
-                                                <button class="btn btn-sm btn-outline-danger fw-semibold" title="Levantar Ticket de Servicio" onclick="openReportFaultModal('${c.id}')">
-                                                    <i class="bi bi-ticket-perforated-fill me-1"></i>Reportar Falla
-                                                </button>
-                                            ` : ""}
+                                            <button class="btn btn-sm btn-outline-danger fw-semibold" title="Levantar Ticket de Servicio" onclick="openReportFaultModal('${c.id}')">
+                                                <i class="bi bi-ticket-perforated-fill me-1"></i>Reportar Falla
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -981,7 +1035,8 @@ function refreshOperatorUI() {
     document.getElementById("opCardEmail").textContent = operator.correo_institucional;
 
     const myComps = appState.componentes.filter(c => c.modulo === modulo && Number(c.estacion) === Number(estacion));
-    document.getElementById("opTotalComponents").textContent = `${myComps.length} equipos`;
+    const realCount = countRealComponents(myComps);
+    document.getElementById("opTotalComponents").textContent = `${realCount} ${realCount === 1 ? "equipo" : "equipos"}`;
     document.getElementById("opGroupedComponentsContainer").innerHTML = renderGroupedCardsHtml(myComps, { showLocation: false });
 
     const myFaults = appState.tickets_fallas.filter(f => f.modulo === modulo && Number(f.estacion) === Number(estacion));
@@ -1043,7 +1098,7 @@ function switchAdminTab(tab) {
 
 function refreshAdminUI({ preserveSelection = false } = {}) {
     const activeFaults = appState.tickets_fallas.filter(f => f.estatus_ticket !== "Finalizada");
-    document.getElementById("adminStatTotal").textContent = appState.componentes.length;
+    document.getElementById("adminStatTotal").textContent = countRealComponents(appState.componentes);
     document.getElementById("adminStatOperators").textContent = appState.operadores.length;
     const totalStations = Object.values(appState.estaciones).reduce((a, b) => a + 1 + Math.max(0, Number(b)), 0);
     document.getElementById("adminStatStations").textContent = totalStations;
@@ -1123,7 +1178,7 @@ function updateCompAssignedOperatorHint() {
 }
 
 async function deleteComponent(id) {
-    if (!confirm("¿Seguro que deseas eliminar este componente del inventario?")) return;
+    if (!confirm("¿Seguro que deseas eliminar este registro del inventario?")) return;
     appState.componentes = appState.componentes.filter(c => c.id !== id);
     await saveState();
     if (currentUser && currentUser.role === "operator") refreshOperatorUI();
@@ -1143,6 +1198,7 @@ function renderAdminInventoryGrouped() {
         if (fMod !== "ALL" && c.modulo !== fMod) return false;
         if (fTipo !== "ALL" && c.tipo_componente !== fTipo) return false;
         if (search) {
+            const isNA = isNoAplicaComponent(c);
             const op = getOperatorByStation(c.modulo, c.estacion);
             const opName = op ? op.nombre_completo : "";
             const estNum = Number(c.estacion);
@@ -1151,7 +1207,11 @@ function renderAdminInventoryGrouped() {
                 ? `0 estacion 0 est 0 e0 servidor`
                 : `${estNum} estacion ${estNum} est ${estNum} e${estNum}`;
 
-            const rawHaystack = `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.serie_lente || ""} ${c.serie_docking || ""} ${c.marca} ${c.modelo} ${c.tipo_componente} ${c.estado_fisico} ${c.observaciones || ""} ${opName} ${estLabel} ${estAliases}`;
+            const compDetails = isNA
+                ? `no aplica sin equipo sin serie ni datos`
+                : `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.serie_lente || ""} ${c.serie_docking || ""} ${c.marca} ${c.modelo} ${c.observaciones || ""}`;
+
+            const rawHaystack = `${c.tipo_componente} ${c.estado_fisico} ${compDetails} ${opName} ${estLabel} ${estAliases}`;
             const haystack = rawHaystack
                 .toLowerCase()
                 .normalize("NFD")
@@ -1374,7 +1434,7 @@ async function removeCatalogItem(key, idx) {
 // ==================== TICKETS DE SERVICIO Y REPORTES DE FALLA ====================
 function openReportFaultModal(compId) {
     const comp = appState.componentes.find(c => c.id === compId);
-    if (!comp) return;
+    if (!comp || isNoAplicaComponent(comp)) return;
     const op = getOperatorByStation(comp.modulo, comp.estacion);
 
     document.getElementById("faultCompId").value = comp.id;
@@ -1391,7 +1451,7 @@ async function submitFaultReport(e) {
     e.preventDefault();
     const compId = document.getElementById("faultCompId").value;
     const comp = appState.componentes.find(c => c.id === compId);
-    if (!comp) return;
+    if (!comp || isNoAplicaComponent(comp)) return;
 
     const op = getOperatorByStation(comp.modulo, comp.estacion);
     const consecutive = String(appState.tickets_fallas.length + 1).padStart(3, "0");
@@ -1464,7 +1524,7 @@ async function submitResolveFault(e) {
 
     if (newStatus === "Finalizada" && document.getElementById("resolveRestoreComponent").checked) {
         const comp = appState.componentes.find(c => c.id === f.componente_id);
-        if (comp) comp.estado_fisico = "Operativo";
+        if (comp && !isNoAplicaComponent(comp)) comp.estado_fisico = "Operativo";
     }
 
     await saveState();
@@ -1678,16 +1738,43 @@ function closeScanner() {
 }
 
 // ==================== CARGA RÁPIDA DE TABLAS MAC (050351, 050353, 050354) ====================
+function buildComponentsFromTable(modulo, tableRows, sourceTag) {
+    return tableRows.map((item, idx) => {
+        const isNA =
+            String(item.serie || "").trim().toUpperCase() === "NO APLICA" ||
+            String(item.marca || "").trim().toUpperCase() === "NO APLICA" ||
+            String(item.estado || "").trim().toLowerCase() === "no aplica";
+
+        return normalizeComponentRecord({
+            id: `CMP-${modulo}-E${item.est}-${idx + 1}-${Date.now()}`,
+            modulo,
+            estacion: item.est,
+            tipo_componente: item.tipo,
+            marca: isNA ? "NO APLICA" : item.marca,
+            modelo: isNA ? "NO APLICA" : item.modelo,
+            numero_serie: isNA ? "NO APLICA" : item.serie,
+            inventario_ine: isNA || item.inv === "NO APLICA" ? "" : item.inv,
+            serie_cpu_vinculada: !isNA && isMonitorType(item.tipo) ? item.cpuVinc : "",
+            serie_lente: !isNA && isCameraType(item.tipo) ? item.lente : "",
+            serie_docking: !isNA && isLaptopType(item.tipo) ? item.docking : "",
+            estado_fisico: isNA ? "No Aplica" : item.estado,
+            observaciones: isNA ? "" : item.obs,
+            registrado_por: sourceTag,
+            fecha_registro: new Date().toLocaleString("es-MX")
+        });
+    });
+}
+
 async function replaceMac050351WithNewTable() {
     const table050351 = [
         // Estación 0
         { est: 0, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "J101CBVA", inv: "22-J101CBVA", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 01", inv: "22-FALTA DATO 01", cpuVinc: "J101CBVA", lente: "", docking: "", estado: "En Revision", obs: "Estacion 0 - Serie pendiente" },
-        { est: 0, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 0" },
-        { est: 0, tipo: "Pad de Firmas", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 0" },
+        { est: 0, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
+        { est: 0, tipo: "Pad de Firmas", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 0, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939581299", inv: "971977", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Impresora", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000TEN", inv: "22-882385", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
-        { est: 0, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 0" },
+        { est: 0, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 0, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "9286360", inv: "22-9286360", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
 
         // Estación 1
@@ -1716,7 +1803,7 @@ async function replaceMac050351WithNewTable() {
         { est: 3, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072003396", inv: "22-1119351", cpuVinc: "", lente: "7797057314", docking: "", estado: "Operativo", obs: "Estacion 3" },
         { est: 3, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ00210006263", inv: "20210765", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
         { est: 3, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939581300", inv: "971978", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
-        { est: 3, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 3" },
+        { est: 3, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 3, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN77UA10MD", inv: "915529", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
         { est: 3, tipo: "Lector QR / Codigo Barras", marca: "Datalogic", modelo: "Quickscan QW2100", serie: "G13H03199", inv: "22-G13H03199", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
 
@@ -1756,44 +1843,17 @@ async function replaceMac050351WithNewTable() {
         { est: 7, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T8", serie: "542076008365", inv: "22-1938446", cpuVinc: "", lente: "1839003590", docking: "", estado: "Operativo", obs: "Estacion 7" },
         { est: 7, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006289", inv: "20220026", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 7" },
         { est: 7, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939681297", inv: "971976", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 7" },
-        { est: 7, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 7" },
-        { est: 7, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 7" },
+        { est: 7, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
+        { est: 7, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 7, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "92770092", inv: "22-92770092", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 7" }
     ];
 
     const otherModulesComponents = appState.componentes.filter(c => c.modulo !== "050351");
-
-    const new050351Components = table050351.map((item, idx) => {
-        const isNa = item.serie.toUpperCase() === "NO APLICA";
-        const tag = item.tipo
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^A-Za-z0-9]/g, "")
-            .toUpperCase()
-            .slice(0, 8);
-        const serieFinal = isNa ? `NA-050351-E${item.est}-${tag}-${idx + 1}` : item.serie;
-
-        return normalizeComponentRecord({
-            id: `CMP-050351-E${item.est}-${idx + 1}-${Date.now()}`,
-            modulo: "050351",
-            estacion: item.est,
-            tipo_componente: item.tipo,
-            marca: item.marca,
-            modelo: item.modelo,
-            numero_serie: serieFinal,
-            inventario_ine: item.inv === "NO APLICA" ? "" : item.inv,
-            serie_cpu_vinculada: isMonitorType(item.tipo) ? item.cpuVinc : "",
-            serie_lente: isCameraType(item.tipo) ? item.lente : "",
-            serie_docking: isLaptopType(item.tipo) ? item.docking : "",
-            estado_fisico: item.estado,
-            observaciones: item.obs,
-            registrado_por: "Carga Tabla 050351",
-            fecha_registro: new Date().toLocaleString("es-MX")
-        });
-    });
+    const new050351Components = buildComponentsFromTable("050351", table050351, "Carga Tabla 050351");
 
     appState.estaciones["050351"] = Math.max(7, Number(appState.estaciones["050351"] ?? 7));
     new050351Components.forEach(c => {
-        if (c.marca && !appState.marcas.some(m => m.toLowerCase() === c.marca.toLowerCase())) {
+        if (!isNoAplicaComponent(c) && c.marca && !appState.marcas.some(m => m.toLowerCase() === c.marca.toLowerCase())) {
             appState.marcas.push(c.marca);
         }
         if (c.tipo_componente && !appState.tipos_componente.some(t => t.toLowerCase() === c.tipo_componente.toLowerCase())) {
@@ -1804,7 +1864,7 @@ async function replaceMac050351WithNewTable() {
     appState.componentes = [...otherModulesComponents, ...new050351Components];
     await saveState();
     if (currentUser && currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
-    alert(`Listo: se cargaron ${new050351Components.length} registros del MAC 050351 (Estaciones 0 a 7).`);
+    alert(`Listo: se cargaron ${countRealComponents(new050351Components)} equipos reales del MAC 050351 (Estaciones 0 a 7).`);
 }
 
 async function replaceMac050353WithNewTable() {
@@ -1829,7 +1889,7 @@ async function replaceMac050353WithNewTable() {
 
         // Estación 2
         { est: 2, tipo: "Laptop", marca: "Lenovo", modelo: "THINK PAD", serie: "PW0ADNNB", inv: "22-PW0ADNNB", cpuVinc: "", lente: "", docking: "ZVQ1GEFW", estado: "Operativo", obs: "Estacion 2" },
-        { est: 2, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 2" },
+        { est: 2, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 2, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-500B", serie: "3LZT001600", inv: "22-FALTA DATO01", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2 - Inv. pendiente: 22-FALTA DATO01" },
         { est: 2, tipo: "Escaner de Huellas", marca: "Morpho", modelo: "IDEMIA MORPHO TOP", serie: "1826S002646", inv: "853342", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
         { est: 2, tipo: "Impresora", marca: "Brother", modelo: "HL-L6200DW", serie: "U6418G9N592969", inv: "C-2023-0129", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
@@ -1838,47 +1898,20 @@ async function replaceMac050353WithNewTable() {
 
         // Estación 3
         { est: 3, tipo: "Laptop", marca: "Lenovo", modelo: "THINK PAD", serie: "PW0ADNN7", inv: "22-PW0ADNN7", cpuVinc: "", lente: "", docking: "FALTA DATO", estado: "Operativo", obs: "Estacion 3 - Docking pendiente" },
-        { est: 3, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 3" },
+        { est: 3, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 3, tipo: "Pad de Firmas", marca: "Generico", modelo: "FALTA DATO", serie: "FALTA DATO-050353-E3", inv: "FALTA DATO", cpuVinc: "", lente: "", docking: "", estado: "En Revision", obs: "Estacion 3 - Datos pendientes (FALTA DATO)" },
-        { est: 3, tipo: "Escaner de Huellas", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 3" },
+        { est: 3, tipo: "Escaner de Huellas", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 3, tipo: "Impresora", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SFA", inv: "C-2023-0130", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
-        { est: 3, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 3" },
-        { est: 3, tipo: "Lector QR / Codigo Barras", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 3" }
+        { est: 3, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
+        { est: 3, tipo: "Lector QR / Codigo Barras", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" }
     ];
 
     const otherModulesComponents = appState.componentes.filter(c => c.modulo !== "050353");
-
-    const new050353Components = table050353.map((item, idx) => {
-        const isNa = item.serie.toUpperCase() === "NO APLICA";
-        const tag = item.tipo
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^A-Za-z0-9]/g, "")
-            .toUpperCase()
-            .slice(0, 8);
-        const serieFinal = isNa ? `NA-050353-E${item.est}-${tag}-${idx + 1}` : item.serie;
-
-        return normalizeComponentRecord({
-            id: `CMP-050353-E${item.est}-${idx + 1}-${Date.now()}`,
-            modulo: "050353",
-            estacion: item.est,
-            tipo_componente: item.tipo,
-            marca: item.marca,
-            modelo: item.modelo,
-            numero_serie: serieFinal,
-            inventario_ine: item.inv === "NO APLICA" ? "" : item.inv,
-            serie_cpu_vinculada: isMonitorType(item.tipo) ? item.cpuVinc : "",
-            serie_lente: isCameraType(item.tipo) ? item.lente : "",
-            serie_docking: isLaptopType(item.tipo) ? item.docking : "",
-            estado_fisico: item.estado,
-            observaciones: item.obs,
-            registrado_por: "Carga Tabla 050353",
-            fecha_registro: new Date().toLocaleString("es-MX")
-        });
-    });
+    const new050353Components = buildComponentsFromTable("050353", table050353, "Carga Tabla 050353");
 
     appState.estaciones["050353"] = Math.max(3, Number(appState.estaciones["050353"] ?? 3));
     new050353Components.forEach(c => {
-        if (c.marca && !appState.marcas.some(m => m.toLowerCase() === c.marca.toLowerCase())) {
+        if (!isNoAplicaComponent(c) && c.marca && !appState.marcas.some(m => m.toLowerCase() === c.marca.toLowerCase())) {
             appState.marcas.push(c.marca);
         }
         if (c.tipo_componente && !appState.tipos_componente.some(t => t.toLowerCase() === c.tipo_componente.toLowerCase())) {
@@ -1889,7 +1922,7 @@ async function replaceMac050353WithNewTable() {
     appState.componentes = [...otherModulesComponents, ...new050353Components];
     await saveState();
     if (currentUser && currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
-    alert(`Listo: se cargaron ${new050353Components.length} registros del MAC 050353 (Estaciones 0 a 3).`);
+    alert(`Listo: se cargaron ${countRealComponents(new050353Components)} equipos reales del MAC 050353 (Estaciones 0 a 3).`);
 }
 
 async function replaceMac050354WithNewTable() {
@@ -1905,56 +1938,29 @@ async function replaceMac050354WithNewTable() {
 
         // Estación 1
         { est: 1, tipo: "Laptop", marca: "Lenovo", modelo: "Lenovo", serie: "PW-0ADNSE", inv: "22-PW-0ADNSE", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
-        { est: 1, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 1" },
+        { est: 1, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 1, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006286", inv: "20210772", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939653074", inv: "1498524", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
-        { est: 1, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 1" },
+        { est: 1, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 1, tipo: "Escaner Digitalizador", marca: "Xerox", modelo: "duplex combo CSANNR", serie: "06CUQ30601", inv: "202100014", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "92770108", inv: "22-92770108", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
 
         // Estación 2
         { est: 2, tipo: "Laptop", marca: "Lenovo", modelo: "Lenovo", serie: "PW-0ADNVL", inv: "22-PW-0ADNVL", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
-        { est: 2, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 2" },
+        { est: 2, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 2, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-500B", serie: "3LZT001758", inv: "850727", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
-        { est: 2, tipo: "Escaner de Huellas", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 2" },
-        { est: 2, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 2" },
-        { est: 2, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 2" },
-        { est: 2, tipo: "Lector QR / Codigo Barras", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "Estacion 2" }
+        { est: 2, tipo: "Escaner de Huellas", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
+        { est: 2, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
+        { est: 2, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
+        { est: 2, tipo: "Lector QR / Codigo Barras", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" }
     ];
 
     const otherModulesComponents = appState.componentes.filter(c => c.modulo !== "050354");
-
-    const new050354Components = table050354.map((item, idx) => {
-        const isNa = item.serie.toUpperCase() === "NO APLICA";
-        const tag = item.tipo
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^A-Za-z0-9]/g, "")
-            .toUpperCase()
-            .slice(0, 8);
-        const serieFinal = isNa ? `NA-050354-E${item.est}-${tag}-${idx + 1}` : item.serie;
-
-        return normalizeComponentRecord({
-            id: `CMP-050354-E${item.est}-${idx + 1}-${Date.now()}`,
-            modulo: "050354",
-            estacion: item.est,
-            tipo_componente: item.tipo,
-            marca: item.marca,
-            modelo: item.modelo,
-            numero_serie: serieFinal,
-            inventario_ine: item.inv === "NO APLICA" ? "" : item.inv,
-            serie_cpu_vinculada: isMonitorType(item.tipo) ? item.cpuVinc : "",
-            serie_lente: isCameraType(item.tipo) ? item.lente : "",
-            serie_docking: isLaptopType(item.tipo) ? item.docking : "",
-            estado_fisico: item.estado,
-            observaciones: item.obs,
-            registrado_por: "Carga Tabla 050354",
-            fecha_registro: new Date().toLocaleString("es-MX")
-        });
-    });
+    const new050354Components = buildComponentsFromTable("050354", table050354, "Carga Tabla 050354");
 
     appState.estaciones["050354"] = Math.max(2, Number(appState.estaciones["050354"] ?? 2));
     new050354Components.forEach(c => {
-        if (c.marca && !appState.marcas.some(m => m.toLowerCase() === c.marca.toLowerCase())) {
+        if (!isNoAplicaComponent(c) && c.marca && !appState.marcas.some(m => m.toLowerCase() === c.marca.toLowerCase())) {
             appState.marcas.push(c.marca);
         }
         if (c.tipo_componente && !appState.tipos_componente.some(t => t.toLowerCase() === c.tipo_componente.toLowerCase())) {
@@ -1965,7 +1971,7 @@ async function replaceMac050354WithNewTable() {
     appState.componentes = [...otherModulesComponents, ...new050354Components];
     await saveState();
     if (currentUser && currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
-    alert(`Listo: se cargaron ${new050354Components.length} registros del MAC 050354 (Estaciones 0 a 2).`);
+    alert(`Listo: se cargaron ${countRealComponents(new050354Components)} equipos reales del MAC 050354 (Estaciones 0 a 2).`);
 }
 
 // ==================== PLANTILLA, IMPORTACIÓN Y EXPORTACIÓN EXCEL (.XLSX / .CSV) ====================
@@ -2074,38 +2080,48 @@ async function importInventoryExcel(event) {
             const estacion = parseStationFromExcel(raw["estacion"] ?? raw["Estacion"] ?? raw["Estación"]);
             const tipo_componente = String(raw["tipo_componente"] ?? raw["Tipo"] ?? raw["Componente"] ?? "").trim() || "Computadora / CPU";
             const marcaRaw = String(raw["marca"] ?? raw["Marca"] ?? "Generico").trim() || "Generico";
-            const marca = marcaRaw.toUpperCase() === "NO APLICA" ? "NO APLICA" : marcaRaw;
-            const modelo = String(raw["modelo"] ?? raw["Modelo"] ?? (marca === "NO APLICA" ? "NO APLICA" : "N/A")).trim() || "N/A";
-            const inventario_ine = String(raw["inventario_ine"] ?? raw["InventarioINE"] ?? raw["Inventario INE"] ?? "").trim().toUpperCase();
-            const serie_cpu_vinculada = String(raw["serie_cpu_vinculada"] ?? raw["SerieCpuVinculada"] ?? "").trim().toUpperCase();
-            const serie_lente = String(raw["serie_lente"] ?? raw["SerieLente"] ?? "").trim().toUpperCase();
-            const serie_docking = String(raw["serie_docking"] ?? raw["SerieDocking"] ?? "").trim().toUpperCase();
-            const observaciones = String(raw["observaciones"] ?? raw["Notas"] ?? "").trim();
+            const estadoRaw = String(raw["estado_fisico"] ?? raw["Estado"] ?? "").trim();
+            const serieRaw = String(raw["numero_serie"] ?? raw["Serie"] ?? raw["Número de Serie"] ?? "").trim().toUpperCase();
 
-            let numero_serie = String(raw["numero_serie"] ?? raw["Serie"] ?? raw["Número de Serie"] ?? "").trim().toUpperCase();
-            if (!numero_serie && marca === "NO APLICA") {
-                const tag = tipo_componente.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 10);
-                numero_serie = `NA-${modulo || "000000"}-E${estacion}-${tag}-${Date.now().toString().slice(-4)}-${added}`;
-            }
+            const isNA =
+                marcaRaw.toUpperCase() === "NO APLICA" ||
+                estadoRaw.toLowerCase() === "no aplica" ||
+                serieRaw === "NO APLICA";
 
-            if (!["050351", "050353", "050354"].includes(modulo) || !numero_serie) {
+            if (!["050351", "050353", "050354"].includes(modulo)) {
                 invalidRows++;
                 continue;
             }
 
-            const exists = appState.componentes.some(c => c.numero_serie === numero_serie);
-            if (exists) {
-                skippedDup++;
+            if (!isNA && !serieRaw) {
+                invalidRows++;
                 continue;
             }
 
-            let estado_fisico = String(raw["estado_fisico"] ?? raw["Estado"] ?? "").trim();
-            const validStates = ["Operativo", "Stock", "En Falla", "En Revision", "En Revisión", "No Aplica", "Baja"];
-            if (!validStates.includes(estado_fisico)) {
-                estado_fisico = marca === "NO APLICA" ? "No Aplica" : "Operativo";
+            if (!isNA) {
+                const exists = appState.componentes.some(c => !isNoAplicaComponent(c) && c.numero_serie === serieRaw);
+                if (exists) {
+                    skippedDup++;
+                    continue;
+                }
             }
 
-            if (marca && !appState.marcas.some(b => b.toLowerCase() === marca.toLowerCase())) {
+            const marca = isNA ? "NO APLICA" : marcaRaw;
+            const modelo = isNA ? "NO APLICA" : (String(raw["modelo"] ?? raw["Modelo"] ?? "N/A").trim() || "N/A");
+            const numero_serie = isNA ? "NO APLICA" : serieRaw;
+            const inventario_ine = isNA ? "" : String(raw["inventario_ine"] ?? raw["InventarioINE"] ?? raw["Inventario INE"] ?? "").trim().toUpperCase();
+            const serie_cpu_vinculada = isNA ? "" : String(raw["serie_cpu_vinculada"] ?? raw["SerieCpuVinculada"] ?? "").trim().toUpperCase();
+            const serie_lente = isNA ? "" : String(raw["serie_lente"] ?? raw["SerieLente"] ?? "").trim().toUpperCase();
+            const serie_docking = isNA ? "" : String(raw["serie_docking"] ?? raw["SerieDocking"] ?? "").trim().toUpperCase();
+            const observaciones = isNA ? "" : String(raw["observaciones"] ?? raw["Notas"] ?? "").trim();
+
+            let estado_fisico = "No Aplica";
+            if (!isNA) {
+                const validStates = ["Operativo", "Stock", "En Falla", "En Revision", "En Revisión", "Baja"];
+                estado_fisico = validStates.includes(estadoRaw) ? estadoRaw : "Operativo";
+            }
+
+            if (!isNA && marca && !appState.marcas.some(b => b.toLowerCase() === marca.toLowerCase())) {
                 appState.marcas.push(marca);
             }
             if (tipo_componente && !appState.tipos_componente.some(t => t.toLowerCase() === tipo_componente.toLowerCase())) {
@@ -2126,9 +2142,9 @@ async function importInventoryExcel(event) {
                 modelo,
                 numero_serie,
                 inventario_ine,
-                serie_cpu_vinculada: isMonitorType(tipo_componente) ? serie_cpu_vinculada : "",
-                serie_lente: isCameraType(tipo_componente) ? serie_lente : "",
-                serie_docking: isLaptopType(tipo_componente) ? serie_docking : "",
+                serie_cpu_vinculada: !isNA && isMonitorType(tipo_componente) ? serie_cpu_vinculada : "",
+                serie_lente: !isNA && isCameraType(tipo_componente) ? serie_lente : "",
+                serie_docking: !isNA && isLaptopType(tipo_componente) ? serie_docking : "",
                 estado_fisico,
                 observaciones,
                 foto_url: "",
@@ -2145,7 +2161,7 @@ async function importInventoryExcel(event) {
 
         alert(
             `Importacion finalizada:\n` +
-            `• Agregados: ${added}\n` +
+            `• Registros procesados: ${added}\n` +
             `• Omitidos por serie duplicada: ${skippedDup}\n` +
             `• Filas incompletas/invalidas: ${invalidRows}`
         );
@@ -2165,6 +2181,7 @@ function exportInventoryExcel() {
 
     const rows = appState.componentes.map((c, idx) => {
         const op = getOperatorByStation(c.modulo, c.estacion);
+        const isNA = isNoAplicaComponent(c);
         return {
             "num": idx + 1,
             "modulo": c.modulo,
@@ -2173,16 +2190,16 @@ function exportInventoryExcel() {
             "telefono": op ? op.telefono : "",
             "correo_institucional": op ? op.correo_institucional : "",
             "tipo_componente": c.tipo_componente,
-            "marca": c.marca,
-            "modelo": c.modelo,
-            "numero_serie": c.numero_serie,
-            "inventario_ine": c.inventario_ine || "",
-            "serie_cpu_vinculada": c.serie_cpu_vinculada || "",
-            "serie_lente": c.serie_lente || "",
-            "serie_docking": c.serie_docking || "",
-            "estado_fisico": c.estado_fisico,
+            "marca": isNA ? "NO APLICA" : c.marca,
+            "modelo": isNA ? "NO APLICA" : c.modelo,
+            "numero_serie": isNA ? "NO APLICA" : c.numero_serie,
+            "inventario_ine": isNA ? "" : (c.inventario_ine || ""),
+            "serie_cpu_vinculada": isNA ? "" : (c.serie_cpu_vinculada || ""),
+            "serie_lente": isNA ? "" : (c.serie_lente || ""),
+            "serie_docking": isNA ? "" : (c.serie_docking || ""),
+            "estado_fisico": isNA ? "No Aplica" : c.estado_fisico,
             "registrado_por": c.registrado_por || "Administrador",
-            "observaciones": c.observaciones || "",
+            "observaciones": isNA ? "No aplica (sin equipo)" : (c.observaciones || ""),
             "fecha_registro": c.fecha_registro || ""
         };
     });
