@@ -284,7 +284,7 @@
                                 </div>
 
                                 <div class="col-12 col-md-3">
-                                    <label for="adminSearchInput" class="form-label fw-semibold mb-1">Buscar (Serie, Inv. INE, CPU, Operador)</label>
+                                    <label for="adminSearchInput" class="form-label fw-semibold mb-1">Buscar (Serie, Inv. INE, CPU, Lente)</label>
                                     <input type="text" class="form-control form-control-sm" id="adminSearchInput" placeholder="Escribe para buscar..." oninput="renderAdminInventoryGrouped()">
                                 </div>
 
@@ -592,7 +592,17 @@
                                         <option value="">-- Seleccionar CPU registrado --</option>
                                     </select>
                                     <label for="compSerieCpuVinculada" class="form-label mb-1">Serie del CPU vinculada</label>
-                                    <input type="text" class="form-control form-control-sm text-uppercase" id="compSerieCpuVinculada" placeholder="Ej. ABC1234XYZ o seleccionarlo arriba">
+                                    <input type="text" class="form-control form-control-sm text-uppercase" id="compSerieCpuVinculada" placeholder="Ej. MZ006XB6 o seleccionarlo arriba">
+                                </div>
+                            </div>
+
+                            <!-- Serie de Lente para Cámaras -->
+                            <div class="col-12 d-none" id="compLensLinkContainer">
+                                <div class="p-2 rounded border bg-light">
+                                    <label for="compSerieLente" class="form-label fw-semibold mb-1">
+                                        <i class="bi bi-camera-reels-fill text-danger me-1"></i>Serie del Lente (Cámara)
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm text-uppercase" id="compSerieLente" placeholder="Ej. 7797051400">
                                 </div>
                             </div>
 
