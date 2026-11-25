@@ -27,6 +27,7 @@ const DEFAULT_STATE = {
     ],
     operadores: [],
     componentes: [],
+    stock_resguardo: [],
     tickets_fallas: []
 };
 
@@ -86,6 +87,33 @@ function normalizeComponentRecord(raw = {}) {
     };
 }
 
+function normalizeStockRecord(raw = {}) {
+    const estRaw = String(raw.estatus ?? "Stock").trim().toLowerCase();
+    const estatus = estRaw === "falla" ? "Falla" : "Stock";
+
+    const desincRaw = String(raw.desincorporacion ?? "No").trim().toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const desincorporacion = desincRaw === "si" ? "Si" : "No";
+
+    let ubicacion = String(raw.ubicacion || "050351").trim();
+    if (ubicacion === "500351") ubicacion = "050351";
+
+    return {
+        id: String(raw.id || "STK-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
+        ubicacion,
+        inventario_ine: String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
+        descripcion: String(raw.descripcion ?? raw.tipo_componente ?? "").trim(),
+        marca: String(raw.marca ?? "").trim(),
+        modelo: String(raw.modelo ?? "").trim(),
+        numero_serie: String(raw.numero_serie ?? raw.serie ?? "").trim().toUpperCase(),
+        serie_lente: String(raw.serie_lente ?? raw.lente ?? "").trim().toUpperCase(),
+        estatus,
+        desincorporacion,
+        observaciones: String(raw.observaciones ?? "").trim(),
+        fecha_registro: String(raw.fecha_registro ?? new Date().toLocaleString("es-MX"))
+    };
+}
+
 function normalizeOperatorRecord(raw = {}) {
     return {
         id: String(raw.id || "OP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
@@ -130,11 +158,14 @@ function migrateStateToV2(raw = {}) {
     const tiposRaw = raw.tipos_componente || raw.types || DEFAULT_STATE.tipos_componente;
     const operadoresRaw = raw.operadores || raw.operators || [];
     const componentesRaw = raw.componentes || raw.components || [];
+    const stockRaw = raw.stock_resguardo || raw.stock || [];
     const ticketsRaw = raw.tickets_fallas || raw.faults || [];
 
+    const hasWrongStockLoc = Array.isArray(stockRaw) && stockRaw.some(s => String(s?.ubicacion || "").trim() === "500351");
     const needsCloudSync =
         Number(raw.version_esquema || 0) !== SCHEMA_VERSION ||
-        Boolean(raw.stations || raw.brands || raw.types || raw.operators || raw.components || raw.faults);
+        Boolean(raw.stations || raw.brands || raw.types || raw.operators || raw.components || raw.faults) ||
+        hasWrongStockLoc;
 
     const migratedState = {
         version_esquema: SCHEMA_VERSION,
@@ -147,6 +178,7 @@ function migrateStateToV2(raw = {}) {
         tipos_componente: Array.isArray(tiposRaw) && tiposRaw.length ? tiposRaw : [...DEFAULT_STATE.tipos_componente],
         operadores: Array.isArray(operadoresRaw) ? operadoresRaw.map(normalizeOperatorRecord) : [],
         componentes: Array.isArray(componentesRaw) ? componentesRaw.map(normalizeComponentRecord) : [],
+        stock_resguardo: Array.isArray(stockRaw) ? stockRaw.map(normalizeStockRecord) : [],
         tickets_fallas: Array.isArray(ticketsRaw) ? ticketsRaw.map(normalizeFaultTicketRecord) : []
     };
 
@@ -160,12 +192,12 @@ function getComponentIcon(tipo) {
     if (t.includes("servidor") || t.includes("rack")) return "bi-hdd-rack-fill";
     if (t.includes("computadora") || t.includes("cpu") || t.includes("pc")) return "bi-pc-display";
     if (t.includes("monitor") || t.includes("pantalla")) return "bi-display";
-    if (t.includes("camara") || t.includes("fotograf")) return "bi-camera-fill";
+    if (t.includes("camara") || t.includes("fotograf") || t.includes("digital")) return "bi-camera-fill";
     if (t.includes("firma") || t.includes("wacom") || t.includes("pad")) return "bi-pen-fill";
     if (t.includes("huella") || t.includes("dactilar") || t.includes("decadactilar") || t.includes("biometr")) return "bi-fingerprint";
     if (t.includes("impresora")) return "bi-printer-fill";
     if (t.includes("qr") || t.includes("codigo") || t.includes("lector")) return "bi-upc-scan";
-    if (t.includes("escaner") || t.includes("digitalizador")) return "bi-file-earmark-ruled-fill";
+    if (t.includes("escaner") || t.includes("digitalizador") || t.includes("cama")) return "bi-file-earmark-ruled-fill";
     if (t.includes("break") || t.includes("ups") || t.includes("energia")) return "bi-battery-charging";
     return "bi-cpu-fill";
 }
@@ -724,6 +756,286 @@ function editComponentById(id) {
     openComponentModal(ctx, c);
 }
 
+// ==================== APARTADO DE STOCK / BODEGA Y DESINCORPORACIÓN ====================
+function onStockStatusChange() {
+    const estatus = document.getElementById("stockEstatus").value;
+    const desincSel = document.getElementById("stockDesincorporacion");
+    if (estatus === "Falla") {
+        desincSel.value = "Si";
+    } else {
+        desincSel.value = "No";
+    }
+}
+
+function openStockModal(stockItemToEdit = null) {
+    document.getElementById("stockForm").reset();
+    if (stockItemToEdit) {
+        document.getElementById("editStockId").value = stockItemToEdit.id;
+        document.getElementById("stockModalTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Equipo en Stock / Baja`;
+        document.getElementById("stockUbicacion").value = stockItemToEdit.ubicacion === "500351" ? "050351" : (stockItemToEdit.ubicacion || "050351");
+        document.getElementById("stockInventarioIne").value = stockItemToEdit.inventario_ine || "";
+        document.getElementById("stockDescripcion").value = stockItemToEdit.descripcion || "";
+        document.getElementById("stockMarca").value = stockItemToEdit.marca || "";
+        document.getElementById("stockModelo").value = stockItemToEdit.modelo || "";
+        document.getElementById("stockSerie").value = stockItemToEdit.numero_serie || "";
+        document.getElementById("stockLente").value = stockItemToEdit.serie_lente || "";
+        document.getElementById("stockEstatus").value = stockItemToEdit.estatus || "Stock";
+        document.getElementById("stockDesincorporacion").value = stockItemToEdit.desincorporacion || "No";
+        document.getElementById("stockObservaciones").value = stockItemToEdit.observaciones || "";
+    } else {
+        document.getElementById("editStockId").value = "";
+        document.getElementById("stockModalTitle").innerHTML = `<i class="bi bi-box-seam-fill text-danger me-2"></i>Registrar Equipo en Stock / Baja`;
+        document.getElementById("stockUbicacion").value = "050351";
+        document.getElementById("stockEstatus").value = "Stock";
+        document.getElementById("stockDesincorporacion").value = "No";
+    }
+    new bootstrap.Modal(document.getElementById("stockModal")).show();
+}
+
+function editStockById(id) {
+    const item = appState.stock_resguardo.find(s => s.id === id);
+    if (!item) return;
+    openStockModal(item);
+}
+
+async function saveStockFromModal(e) {
+    e.preventDefault();
+    const editId = document.getElementById("editStockId").value;
+    let ubicacion = document.getElementById("stockUbicacion").value.trim() || "050351";
+    if (ubicacion === "500351") ubicacion = "050351";
+
+    const inventario_ine = document.getElementById("stockInventarioIne").value.trim().toUpperCase();
+    const descripcion = document.getElementById("stockDescripcion").value.trim();
+    const marca = document.getElementById("stockMarca").value.trim();
+    const modelo = document.getElementById("stockModelo").value.trim();
+    const numero_serie = document.getElementById("stockSerie").value.trim().toUpperCase();
+    const serie_lente = document.getElementById("stockLente").value.trim().toUpperCase();
+    const estatus = document.getElementById("stockEstatus").value;
+    const desincorporacion = document.getElementById("stockDesincorporacion").value;
+    const observaciones = document.getElementById("stockObservaciones").value.trim();
+
+    const dup = appState.stock_resguardo.find(s => s.numero_serie === numero_serie && s.id !== editId);
+    if (dup) {
+        alert(`La serie "${numero_serie}" ya esta registrada en Stock (Ubicacion: ${dup.ubicacion}).`);
+        return;
+    }
+
+    if (editId) {
+        const idx = appState.stock_resguardo.findIndex(s => s.id === editId);
+        if (idx !== -1) {
+            appState.stock_resguardo[idx] = normalizeStockRecord({
+                ...appState.stock_resguardo[idx],
+                ubicacion,
+                inventario_ine,
+                descripcion,
+                marca,
+                modelo,
+                numero_serie,
+                serie_lente,
+                estatus,
+                desincorporacion,
+                observaciones
+            });
+        }
+    } else {
+        appState.stock_resguardo.push(normalizeStockRecord({
+            id: "STK-" + Date.now(),
+            ubicacion,
+            inventario_ine,
+            descripcion,
+            marca,
+            modelo,
+            numero_serie,
+            serie_lente,
+            estatus,
+            desincorporacion,
+            observaciones,
+            fecha_registro: new Date().toLocaleString("es-MX")
+        }));
+    }
+
+    await saveState();
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById("stockModal"));
+    if (modalInstance) modalInstance.hide();
+    refreshAdminUI({ preserveSelection: true });
+}
+
+async function deleteStockItem(id) {
+    if (!confirm("¿Seguro que deseas eliminar este registro del apartado de Stock?")) return;
+    appState.stock_resguardo = appState.stock_resguardo.filter(s => s.id !== id);
+    await saveState();
+    refreshAdminUI({ preserveSelection: true });
+}
+
+function renderAdminStockTable() {
+    const list = appState.stock_resguardo || [];
+    const totalEl = document.getElementById("stockStatTotal");
+    const dispEl = document.getElementById("stockStatDisponibles");
+    const fallaEl = document.getElementById("stockStatFalla");
+    const desincEl = document.getElementById("stockStatDesinc");
+    const badgeEl = document.getElementById("admStockBadge");
+
+    const disponibles = list.filter(s => s.estatus === "Stock").length;
+    const enFalla = list.filter(s => s.estatus === "Falla").length;
+    const paraDesinc = list.filter(s => s.desincorporacion === "Si").length;
+
+    if (totalEl) totalEl.textContent = list.length;
+    if (dispEl) dispEl.textContent = disponibles;
+    if (fallaEl) fallaEl.textContent = enFalla;
+    if (desincEl) desincEl.textContent = paraDesinc;
+    if (badgeEl) badgeEl.textContent = list.length;
+
+    const tbody = document.getElementById("adminStockTableBody");
+    if (!tbody) return;
+
+    const fEstatus = document.getElementById("stockFilterEstatus")?.value || "ALL";
+    const fDesinc = document.getElementById("stockFilterDesinc")?.value || "ALL";
+    const search = (document.getElementById("stockSearchInput")?.value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+
+    const filtered = list.filter(s => {
+        if (fEstatus !== "ALL" && s.estatus !== fEstatus) return false;
+        if (fDesinc !== "ALL" && s.desincorporacion !== fDesinc) return false;
+        if (search) {
+            const haystack = `${s.ubicacion} ${s.inventario_ine} ${s.descripcion} ${s.marca} ${s.modelo} ${s.numero_serie} ${s.serie_lente} ${s.estatus} ${s.desincorporacion} ${s.observaciones}`
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+            const terms = search.split(/\s+/).filter(Boolean);
+            if (!terms.every(t => haystack.includes(t))) return false;
+        }
+        return true;
+    });
+
+    if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No hay equipos registrados en Stock / Resguardo con este filtro.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(s => {
+        const iconClass = getComponentIcon(s.descripcion);
+        const isFalla = s.estatus === "Falla";
+        const isDesinc = s.desincorporacion === "Si";
+
+        return `
+            <tr>
+                <td><span class="badge bg-dark">${s.ubicacion}</span></td>
+                <td class="fw-bold font-monospace">${s.inventario_ine || "—"}</td>
+                <td class="fw-semibold">
+                    <i class="bi ${iconClass} text-danger me-1"></i>${s.descripcion}
+                    ${s.observaciones ? `<div class="text-muted fw-normal">${s.observaciones}</div>` : ""}
+                </td>
+                <td><strong>${s.marca}</strong> <span class="text-muted">${s.modelo}</span></td>
+                <td>
+                    <span class="font-monospace fw-bold bg-light px-2 py-1 rounded border">${s.numero_serie}</span>
+                    ${s.serie_lente ? `<div class="text-secondary mt-1"><i class="bi bi-camera-reels me-1"></i>Lente: <strong class="font-monospace">${s.serie_lente}</strong></div>` : ""}
+                </td>
+                <td>
+                    ${isFalla
+                        ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Falla</span>`
+                        : `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Stock</span>`}
+                </td>
+                <td>
+                    ${isDesinc
+                        ? `<span class="badge bg-warning text-dark">Sí (Desincorporación)</span>`
+                        : `<span class="badge bg-success-subtle text-success border border-success-subtle">No</span>`}
+                </td>
+                <td class="text-end">
+                    <div class="d-flex justify-content-end gap-1">
+                        <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="editStockById('${s.id}')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" title="Eliminar" onclick="deleteStockItem('${s.id}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+async function loadInitialStock050351() {
+    const initialStockRows = [
+        // Impresoras y Escáner
+        { ubicacion: "050351", inv: "1120405", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592983", lente: "", estatus: "Stock", desinc: "No" },
+        { ubicacion: "050351", inv: "1120432", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592940", lente: "", estatus: "Stock", desinc: "No" },
+        { ubicacion: "050351", inv: "882374", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000RMM", lente: "", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "882380", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SQM", lente: "", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "882381", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SXN", lente: "", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "882382", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000T1Z", lente: "", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "882384", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SGY", lente: "", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "882405", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJAGC000R7X", lente: "", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "893583", desc: "Escaner de cama plana", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA107Q", lente: "", estatus: "Falla", desinc: "Si" },
+
+        // Cámaras
+        { ubicacion: "050351", inv: "698583", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038402", lente: "747048984", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "698584", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038403", lente: "747048985", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "698585", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038405", lente: "747048987", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "698586", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038406", lente: "747048988", estatus: "Falla", desinc: "Si" },
+        { ubicacion: "050351", inv: "698588", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "352074049589", lente: "1047005158", estatus: "Falla", desinc: "Si" }
+    ];
+
+    const seriesToReplace = new Set(initialStockRows.map(r => r.serie.toUpperCase()));
+    const remainingStock = (appState.stock_resguardo || []).filter(s => !seriesToReplace.has(s.numero_serie));
+
+    const newStockRecords = initialStockRows.map((r, idx) => normalizeStockRecord({
+        id: `STK-050351-${idx + 1}-${Date.now()}`,
+        ubicacion: r.ubicacion,
+        inventario_ine: r.inv,
+        descripcion: r.desc,
+        marca: r.marca,
+        modelo: r.modelo,
+        numero_serie: r.serie,
+        serie_lente: r.lente,
+        estatus: r.estatus,
+        desincorporacion: r.desinc,
+        observaciones: "",
+        fecha_registro: new Date().toLocaleString("es-MX")
+    }));
+
+    appState.stock_resguardo = [...remainingStock, ...newStockRecords];
+    await saveState();
+    refreshAdminUI({ preserveSelection: true });
+    alert(`Listo: se cargaron ${newStockRecords.length} equipos en Stock / Desincorporacion (Ubicacion 050351).`);
+}
+
+function exportStockExcel() {
+    const list = appState.stock_resguardo || [];
+    if (!list.length) {
+        alert("No hay registros en Stock / Desincorporacion para exportar.");
+        return;
+    }
+
+    const rows = list.map((s, idx) => ({
+        "num": idx + 1,
+        "ubicacion": s.ubicacion,
+        "inventario_ine": s.inventario_ine || "",
+        "descripcion": s.descripcion,
+        "marca": s.marca,
+        "modelo": s.modelo,
+        "serie": s.numero_serie,
+        "lente": s.serie_lente || "",
+        "estatus": s.estatus,
+        "desincorporacion": s.desincorporacion === "Si" ? "Sí" : "No",
+        "observaciones": s.observaciones || ""
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+        { wch: 6 }, { wch: 12 }, { wch: 16 }, { wch: 24 },
+        { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 16 },
+        { wch: 12 }, { wch: 18 }, { wch: 28 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, "stock_desincorporacion");
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `stock_desincorporacion_macs_${fecha}.xlsx`);
+}
+
 // ==================== SINCRONIZACIÓN FIRESTORE EN TIEMPO REAL CON MIGRACIÓN ====================
 function loadLocalCache() {
     try {
@@ -1089,10 +1401,12 @@ function refreshOperatorUI() {
 function switchAdminTab(tab) {
     activeAdminTab = tab;
     persistSession();
-    const tabs = ["inventario", "operadores", "config", "fallas"];
+    const tabs = ["inventario", "stock", "operadores", "config", "fallas"];
     tabs.forEach(t => {
-        document.getElementById(`adm-tab-${t}`).classList.toggle("active", t === tab);
-        document.getElementById(`admSection${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.toggle("d-none", t !== tab);
+        const tabBtn = document.getElementById(`adm-tab-${t}`);
+        const secDiv = document.getElementById(`admSection${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (tabBtn) tabBtn.classList.toggle("active", t === tab);
+        if (secDiv) secDiv.classList.toggle("d-none", t !== tab);
     });
 }
 
@@ -1131,6 +1445,7 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
     updateOpRoleHint();
 
     renderAdminInventoryGrouped();
+    renderAdminStockTable();
     renderOperatorsTable();
     renderCatalogs();
     renderAdminFaultsTable();
@@ -2292,6 +2607,15 @@ Object.assign(window, {
     updateCompAssignedOperatorHint,
     deleteComponent,
     renderAdminInventoryGrouped,
+    onStockStatusChange,
+    openStockModal,
+    editStockById,
+    saveStockFromModal,
+    deleteStockItem,
+    renderAdminStockTable,
+    loadInitialStock050351,
+    loadInitialStock500351: loadInitialStock050351,
+    exportStockExcel,
     onOpRegModuloChange,
     updateOpRoleHint,
     saveOperator,
