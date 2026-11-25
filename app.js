@@ -95,12 +95,13 @@ function normalizeStockRecord(raw = {}) {
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const desincorporacion = desincRaw === "si" ? "Si" : "No";
 
-    let ubicacion = String(raw.ubicacion || "050351").trim();
-    if (ubicacion === "500351") ubicacion = "050351";
+    let origen = String(raw.origen ?? raw.ubicacion ?? "050351").trim();
+    if (origen === "500351") origen = "050351";
 
     return {
         id: String(raw.id || "STK-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
-        ubicacion,
+        origen,
+        destino: String(raw.destino ?? "").trim(),
         inventario_ine: String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
         descripcion: String(raw.descripcion ?? raw.tipo_componente ?? "").trim(),
         marca: String(raw.marca ?? "").trim(),
@@ -109,6 +110,8 @@ function normalizeStockRecord(raw = {}) {
         serie_lente: String(raw.serie_lente ?? raw.lente ?? "").trim().toUpperCase(),
         estatus,
         desincorporacion,
+        fecha_desincorporacion: String(raw.fecha_desincorporacion ?? raw.fechaDesincorporacion ?? "").trim(),
+        oficio_desincorporacion: String(raw.oficio_desincorporacion ?? raw.oficioDesincorporacion ?? "").trim().toUpperCase(),
         observaciones: String(raw.observaciones ?? "").trim(),
         fecha_registro: String(raw.fecha_registro ?? new Date().toLocaleString("es-MX"))
     };
@@ -161,11 +164,15 @@ function migrateStateToV2(raw = {}) {
     const stockRaw = raw.stock_resguardo || raw.stock || [];
     const ticketsRaw = raw.tickets_fallas || raw.faults || [];
 
-    const hasWrongStockLoc = Array.isArray(stockRaw) && stockRaw.some(s => String(s?.ubicacion || "").trim() === "500351");
+    const hasLegacyStockFields = Array.isArray(stockRaw) && stockRaw.some(s =>
+        String(s?.ubicacion || "").trim() === "500351" ||
+        (s && Object.prototype.hasOwnProperty.call(s, "ubicacion") && !Object.prototype.hasOwnProperty.call(s, "origen"))
+    );
+
     const needsCloudSync =
         Number(raw.version_esquema || 0) !== SCHEMA_VERSION ||
         Boolean(raw.stations || raw.brands || raw.types || raw.operators || raw.components || raw.faults) ||
-        hasWrongStockLoc;
+        hasLegacyStockFields;
 
     const migratedState = {
         version_esquema: SCHEMA_VERSION,
@@ -760,10 +767,15 @@ function editComponentById(id) {
 function onStockStatusChange() {
     const estatus = document.getElementById("stockEstatus").value;
     const desincSel = document.getElementById("stockDesincorporacion");
-    if (estatus === "Falla") {
-        desincSel.value = "Si";
-    } else {
-        desincSel.value = "No";
+    desincSel.value = estatus === "Falla" ? "Si" : "No";
+    onStockDesincChange();
+}
+
+function onStockDesincChange() {
+    const desinc = document.getElementById("stockDesincorporacion").value;
+    const fechaEl = document.getElementById("stockFechaDesinc");
+    if (desinc === "Si" && !fechaEl.value) {
+        fechaEl.value = new Date().toISOString().slice(0, 10);
     }
 }
 
@@ -772,7 +784,8 @@ function openStockModal(stockItemToEdit = null) {
     if (stockItemToEdit) {
         document.getElementById("editStockId").value = stockItemToEdit.id;
         document.getElementById("stockModalTitle").innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Editar Equipo en Stock / Baja`;
-        document.getElementById("stockUbicacion").value = stockItemToEdit.ubicacion === "500351" ? "050351" : (stockItemToEdit.ubicacion || "050351");
+        document.getElementById("stockOrigen").value = stockItemToEdit.origen === "500351" ? "050351" : (stockItemToEdit.origen || "050351");
+        document.getElementById("stockDestino").value = stockItemToEdit.destino || "";
         document.getElementById("stockInventarioIne").value = stockItemToEdit.inventario_ine || "";
         document.getElementById("stockDescripcion").value = stockItemToEdit.descripcion || "";
         document.getElementById("stockMarca").value = stockItemToEdit.marca || "";
@@ -781,13 +794,18 @@ function openStockModal(stockItemToEdit = null) {
         document.getElementById("stockLente").value = stockItemToEdit.serie_lente || "";
         document.getElementById("stockEstatus").value = stockItemToEdit.estatus || "Stock";
         document.getElementById("stockDesincorporacion").value = stockItemToEdit.desincorporacion || "No";
+        document.getElementById("stockFechaDesinc").value = stockItemToEdit.fecha_desincorporacion || "";
+        document.getElementById("stockOficioDesinc").value = stockItemToEdit.oficio_desincorporacion || "";
         document.getElementById("stockObservaciones").value = stockItemToEdit.observaciones || "";
     } else {
         document.getElementById("editStockId").value = "";
         document.getElementById("stockModalTitle").innerHTML = `<i class="bi bi-box-seam-fill text-danger me-2"></i>Registrar Equipo en Stock / Baja`;
-        document.getElementById("stockUbicacion").value = "050351";
+        document.getElementById("stockOrigen").value = "050351";
+        document.getElementById("stockDestino").value = "";
         document.getElementById("stockEstatus").value = "Stock";
         document.getElementById("stockDesincorporacion").value = "No";
+        document.getElementById("stockFechaDesinc").value = "";
+        document.getElementById("stockOficioDesinc").value = "";
     }
     new bootstrap.Modal(document.getElementById("stockModal")).show();
 }
@@ -801,9 +819,10 @@ function editStockById(id) {
 async function saveStockFromModal(e) {
     e.preventDefault();
     const editId = document.getElementById("editStockId").value;
-    let ubicacion = document.getElementById("stockUbicacion").value.trim() || "050351";
-    if (ubicacion === "500351") ubicacion = "050351";
+    let origen = document.getElementById("stockOrigen").value.trim() || "050351";
+    if (origen === "500351") origen = "050351";
 
+    const destino = document.getElementById("stockDestino").value.trim();
     const inventario_ine = document.getElementById("stockInventarioIne").value.trim().toUpperCase();
     const descripcion = document.getElementById("stockDescripcion").value.trim();
     const marca = document.getElementById("stockMarca").value.trim();
@@ -812,11 +831,13 @@ async function saveStockFromModal(e) {
     const serie_lente = document.getElementById("stockLente").value.trim().toUpperCase();
     const estatus = document.getElementById("stockEstatus").value;
     const desincorporacion = document.getElementById("stockDesincorporacion").value;
+    const fecha_desincorporacion = document.getElementById("stockFechaDesinc").value.trim();
+    const oficio_desincorporacion = document.getElementById("stockOficioDesinc").value.trim().toUpperCase();
     const observaciones = document.getElementById("stockObservaciones").value.trim();
 
     const dup = appState.stock_resguardo.find(s => s.numero_serie === numero_serie && s.id !== editId);
     if (dup) {
-        alert(`La serie "${numero_serie}" ya esta registrada en Stock (Ubicacion: ${dup.ubicacion}).`);
+        alert(`La serie "${numero_serie}" ya esta registrada en Stock (Origen: ${dup.origen}).`);
         return;
     }
 
@@ -825,7 +846,8 @@ async function saveStockFromModal(e) {
         if (idx !== -1) {
             appState.stock_resguardo[idx] = normalizeStockRecord({
                 ...appState.stock_resguardo[idx],
-                ubicacion,
+                origen,
+                destino,
                 inventario_ine,
                 descripcion,
                 marca,
@@ -834,13 +856,16 @@ async function saveStockFromModal(e) {
                 serie_lente,
                 estatus,
                 desincorporacion,
+                fecha_desincorporacion,
+                oficio_desincorporacion,
                 observaciones
             });
         }
     } else {
         appState.stock_resguardo.push(normalizeStockRecord({
             id: "STK-" + Date.now(),
-            ubicacion,
+            origen,
+            destino,
             inventario_ine,
             descripcion,
             marca,
@@ -849,6 +874,8 @@ async function saveStockFromModal(e) {
             serie_lente,
             estatus,
             desincorporacion,
+            fecha_desincorporacion,
+            oficio_desincorporacion,
             observaciones,
             fecha_registro: new Date().toLocaleString("es-MX")
         }));
@@ -900,7 +927,7 @@ function renderAdminStockTable() {
         if (fEstatus !== "ALL" && s.estatus !== fEstatus) return false;
         if (fDesinc !== "ALL" && s.desincorporacion !== fDesinc) return false;
         if (search) {
-            const haystack = `${s.ubicacion} ${s.inventario_ine} ${s.descripcion} ${s.marca} ${s.modelo} ${s.numero_serie} ${s.serie_lente} ${s.estatus} ${s.desincorporacion} ${s.observaciones}`
+            const haystack = `${s.origen} ${s.destino} ${s.inventario_ine} ${s.descripcion} ${s.marca} ${s.modelo} ${s.numero_serie} ${s.serie_lente} ${s.estatus} ${s.desincorporacion} ${s.fecha_desincorporacion} ${s.oficio_desincorporacion} ${s.observaciones}`
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "");
@@ -911,7 +938,7 @@ function renderAdminStockTable() {
     });
 
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No hay equipos registrados en Stock / Resguardo con este filtro.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No hay equipos registrados en Stock / Resguardo con este filtro.</td></tr>`;
         return;
     }
 
@@ -922,7 +949,8 @@ function renderAdminStockTable() {
 
         return `
             <tr>
-                <td><span class="badge bg-dark">${s.ubicacion}</span></td>
+                <td><span class="badge bg-dark">${s.origen}</span></td>
+                <td>${s.destino ? `<span class="fw-semibold text-primary">${s.destino}</span>` : `<span class="text-muted">—</span>`}</td>
                 <td class="fw-bold font-monospace">${s.inventario_ine || "—"}</td>
                 <td class="fw-semibold">
                     <i class="bi ${iconClass} text-danger me-1"></i>${s.descripcion}
@@ -943,6 +971,12 @@ function renderAdminStockTable() {
                         ? `<span class="badge bg-warning text-dark">Sí (Desincorporación)</span>`
                         : `<span class="badge bg-success-subtle text-success border border-success-subtle">No</span>`}
                 </td>
+                <td>
+                    ${(s.fecha_desincorporacion || s.oficio_desincorporacion)
+                        ? `<div>${s.fecha_desincorporacion ? `<small class="fw-semibold"><i class="bi bi-calendar-event me-1"></i>${s.fecha_desincorporacion}</small>` : ""}</div>
+                           <div>${s.oficio_desincorporacion ? `<span class="badge bg-light text-dark border font-monospace mt-1">${s.oficio_desincorporacion}</span>` : ""}</div>`
+                        : `<span class="text-muted">—</span>`}
+                </td>
                 <td class="text-end">
                     <div class="d-flex justify-content-end gap-1">
                         <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="editStockById('${s.id}')">
@@ -960,23 +994,20 @@ function renderAdminStockTable() {
 
 async function loadInitialStock050351() {
     const initialStockRows = [
-        // Impresoras y Escáner
-        { ubicacion: "050351", inv: "1120405", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592983", lente: "", estatus: "Stock", desinc: "No" },
-        { ubicacion: "050351", inv: "1120432", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592940", lente: "", estatus: "Stock", desinc: "No" },
-        { ubicacion: "050351", inv: "882374", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000RMM", lente: "", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "882380", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SQM", lente: "", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "882381", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SXN", lente: "", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "882382", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000T1Z", lente: "", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "882384", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SGY", lente: "", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "882405", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJAGC000R7X", lente: "", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "893583", desc: "Escaner de cama plana", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA107Q", lente: "", estatus: "Falla", desinc: "Si" },
-
-        // Cámaras
-        { ubicacion: "050351", inv: "698583", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038402", lente: "747048984", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "698584", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038403", lente: "747048985", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "698585", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038405", lente: "747048987", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "698586", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038406", lente: "747048988", estatus: "Falla", desinc: "Si" },
-        { ubicacion: "050351", inv: "698588", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "352074049589", lente: "1047005158", estatus: "Falla", desinc: "Si" }
+        { origen: "050351", destino: "", inv: "1120405", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592983", lente: "", estatus: "Stock", desinc: "No" },
+        { origen: "050351", destino: "", inv: "1120432", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592940", lente: "", estatus: "Stock", desinc: "No" },
+        { origen: "050351", destino: "", inv: "882374", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000RMM", lente: "", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "882380", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SQM", lente: "", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "882381", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SXN", lente: "", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "882382", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000T1Z", lente: "", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "882384", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SGY", lente: "", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "882405", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJAGC000R7X", lente: "", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "893583", desc: "Escaner de cama plana", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA107Q", lente: "", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "698583", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038402", lente: "747048984", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "698584", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038403", lente: "747048985", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "698585", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038405", lente: "747048987", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "698586", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038406", lente: "747048988", estatus: "Falla", desinc: "Si" },
+        { origen: "050351", destino: "", inv: "698588", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "352074049589", lente: "1047005158", estatus: "Falla", desinc: "Si" }
     ];
 
     const seriesToReplace = new Set(initialStockRows.map(r => r.serie.toUpperCase()));
@@ -984,7 +1015,8 @@ async function loadInitialStock050351() {
 
     const newStockRecords = initialStockRows.map((r, idx) => normalizeStockRecord({
         id: `STK-050351-${idx + 1}-${Date.now()}`,
-        ubicacion: r.ubicacion,
+        origen: r.origen,
+        destino: r.destino,
         inventario_ine: r.inv,
         descripcion: r.desc,
         marca: r.marca,
@@ -993,6 +1025,8 @@ async function loadInitialStock050351() {
         serie_lente: r.lente,
         estatus: r.estatus,
         desincorporacion: r.desinc,
+        fecha_desincorporacion: "",
+        oficio_desincorporacion: "",
         observaciones: "",
         fecha_registro: new Date().toLocaleString("es-MX")
     }));
@@ -1000,7 +1034,6 @@ async function loadInitialStock050351() {
     appState.stock_resguardo = [...remainingStock, ...newStockRecords];
     await saveState();
     refreshAdminUI({ preserveSelection: true });
-    alert(`Listo: se cargaron ${newStockRecords.length} equipos en Stock / Desincorporacion (Ubicacion 050351).`);
 }
 
 function exportStockExcel() {
@@ -1012,7 +1045,8 @@ function exportStockExcel() {
 
     const rows = list.map((s, idx) => ({
         "num": idx + 1,
-        "ubicacion": s.ubicacion,
+        "origen": s.origen,
+        "destino": s.destino || "",
         "inventario_ine": s.inventario_ine || "",
         "descripcion": s.descripcion,
         "marca": s.marca,
@@ -1021,15 +1055,18 @@ function exportStockExcel() {
         "lente": s.serie_lente || "",
         "estatus": s.estatus,
         "desincorporacion": s.desincorporacion === "Si" ? "Sí" : "No",
+        "fecha_desincorporacion": s.fecha_desincorporacion || "",
+        "oficio_desincorporacion": s.oficio_desincorporacion || "",
         "observaciones": s.observaciones || ""
     }));
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-        { wch: 6 }, { wch: 12 }, { wch: 16 }, { wch: 24 },
-        { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 16 },
-        { wch: 12 }, { wch: 18 }, { wch: 28 }
+        { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 16 },
+        { wch: 24 }, { wch: 14 }, { wch: 18 }, { wch: 22 },
+        { wch: 16 }, { wch: 12 }, { wch: 18 }, { wch: 22 },
+        { wch: 26 }, { wch: 28 }
     ];
     XLSX.utils.book_append_sheet(wb, ws, "stock_desincorporacion");
     const fecha = new Date().toISOString().slice(0, 10);
@@ -2082,7 +2119,6 @@ function buildComponentsFromTable(modulo, tableRows, sourceTag) {
 
 async function replaceMac050351WithNewTable() {
     const table050351 = [
-        // Estación 0
         { est: 0, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "J101CBVA", inv: "22-J101CBVA", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 01", inv: "22-FALTA DATO 01", cpuVinc: "J101CBVA", lente: "", docking: "", estado: "En Revision", obs: "Estacion 0 - Serie pendiente" },
         { est: 0, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
@@ -2092,7 +2128,6 @@ async function replaceMac050351WithNewTable() {
         { est: 0, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 0, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "9286360", inv: "22-9286360", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
 
-        // Estación 1
         { est: 1, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XB6", inv: "22-MZ006XB6", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "1563EBMARZLAVNAA5DYL", inv: "22-A5DYL", cpuVinc: "MZ006XB6", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072002447", inv: "22-1119350", cpuVinc: "", lente: "7797051400", docking: "", estado: "Operativo", obs: "Estacion 1" },
@@ -2102,7 +2137,6 @@ async function replaceMac050351WithNewTable() {
         { est: 1, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN78GAIOMF", inv: "920941", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Lector QR / Codigo Barras", marca: "Nextep", modelo: "NE-503", serie: "22030479", inv: "C-INE-084-2022-0131", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
 
-        // Estación 2
         { est: 2, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006X9G", inv: "22-MZ006X9G", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
         { est: 2, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "1563EBMAR2LVNAA7BXD", inv: "22-7BXD", cpuVinc: "MZ006X9G", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
         { est: 2, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072035453", inv: "22-1119352", cpuVinc: "", lente: "7897038386", docking: "", estado: "Operativo", obs: "Estacion 2" },
@@ -2112,7 +2146,6 @@ async function replaceMac050351WithNewTable() {
         { est: 2, tipo: "Escaner Digitalizador", marca: "Xerox", modelo: "Duplex Combo", serie: "06CUQ30426", inv: "EM-000360", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
         { est: 2, tipo: "Lector QR / Codigo Barras", marca: "Datalogic", modelo: "Quickscan QW2100", serie: "G13H03190", inv: "22-G13H03190", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
 
-        // Estación 3
         { est: 3, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XB5", inv: "22-MZ006XB5", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
         { est: 3, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 01-E3", inv: "22-FALTA DATO 01", cpuVinc: "MZ006XB5", lente: "", docking: "", estado: "En Revision", obs: "Estacion 3 - Serie original: FALTA DATO 01" },
         { est: 3, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072003396", inv: "22-1119351", cpuVinc: "", lente: "7797057314", docking: "", estado: "Operativo", obs: "Estacion 3" },
@@ -2122,7 +2155,6 @@ async function replaceMac050351WithNewTable() {
         { est: 3, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN77UA10MD", inv: "915529", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
         { est: 3, tipo: "Lector QR / Codigo Barras", marca: "Datalogic", modelo: "Quickscan QW2100", serie: "G13H03199", inv: "22-G13H03199", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 3" },
 
-        // Estación 4
         { est: 4, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XCH", inv: "22-MZ006XCH", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 4" },
         { est: 4, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 02", inv: "22-FALTA DATO 02", cpuVinc: "MZ006XCH", lente: "", docking: "", estado: "En Revision", obs: "Estacion 4 - Serie pendiente" },
         { est: 4, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "542076008381", inv: "22-1938463", cpuVinc: "", lente: "1839000871", docking: "", estado: "Operativo", obs: "Estacion 4" },
@@ -2132,7 +2164,6 @@ async function replaceMac050351WithNewTable() {
         { est: 4, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN77UA10MB", inv: "915928", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 4" },
         { est: 4, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "92868361", inv: "22-92868361", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 4" },
 
-        // Estación 5
         { est: 5, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XC2", inv: "22-MZ006XC2", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 5" },
         { est: 5, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 03", inv: "22-FALTA DATO 03", cpuVinc: "MZ006XC2", lente: "", docking: "", estado: "En Revision", obs: "Estacion 5 - Serie pendiente" },
         { est: 5, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "542076008341", inv: "22-1938423", cpuVinc: "", lente: "1839003531", docking: "", estado: "Operativo", obs: "Estacion 5" },
@@ -2142,7 +2173,6 @@ async function replaceMac050351WithNewTable() {
         { est: 5, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN77UA10RB", inv: "915530", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 5" },
         { est: 5, tipo: "Lector QR / Codigo Barras", marca: "Datalogic", modelo: "Quickscan QW2100", serie: "G13H03198", inv: "22-G13H03198", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 5" },
 
-        // Estación 6
         { est: 6, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006X8C", inv: "22-MZ006X8C", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 6" },
         { est: 6, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 04", inv: "22-FALTA DATO 04", cpuVinc: "MZ006X8C", lente: "", docking: "", estado: "En Revision", obs: "Estacion 6 - Serie pendiente" },
         { est: 6, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072002426", inv: "22-1119353", cpuVinc: "", lente: "7797051361", docking: "", estado: "Operativo", obs: "Estacion 6" },
@@ -2152,7 +2182,6 @@ async function replaceMac050351WithNewTable() {
         { est: 6, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA1086", inv: "893584", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 6" },
         { est: 6, tipo: "Lector QR / Codigo Barras", marca: "Nextep", modelo: "NE-503", serie: "22030471", inv: "C-INE-084-2022-0129", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 6" },
 
-        // Estación 7
         { est: 7, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006X9Z", inv: "22-MZ006X9Z", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 7" },
         { est: 7, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 05", inv: "22-FALTA DATO 05", cpuVinc: "MZ006X9Z", lente: "", docking: "", estado: "En Revision", obs: "Estacion 7 - Serie pendiente" },
         { est: 7, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T8", serie: "542076008365", inv: "22-1938446", cpuVinc: "", lente: "1839003590", docking: "", estado: "Operativo", obs: "Estacion 7" },
@@ -2184,7 +2213,6 @@ async function replaceMac050351WithNewTable() {
 
 async function replaceMac050353WithNewTable() {
     const table050353 = [
-        // Estación 0
         { est: 0, tipo: "Laptop", marca: "Lenovo", modelo: "THINK PAD", serie: "PW0ADNN0", inv: "22-PW0ADNN0", cpuVinc: "", lente: "", docking: "ZVQ1GKN6", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T3", serie: "322174038405", inv: "698585", cpuVinc: "", lente: "747048982", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006292", inv: "20220027", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
@@ -2193,7 +2221,6 @@ async function replaceMac050353WithNewTable() {
         { est: 0, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA107F", inv: "893585", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "QCPASS", serie: "92770091", inv: "22-92770091", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
 
-        // Estación 1
         { est: 1, tipo: "Laptop", marca: "Lenovo", modelo: "THINK PAD", serie: "PW0ADNGF", inv: "22-PW0ADNGF", cpuVinc: "", lente: "", docking: "ZVQ1GKLQ", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "542076008401", inv: "1938477", cpuVinc: "", lente: "1839000903", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006291", inv: "20220028", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
@@ -2202,7 +2229,6 @@ async function replaceMac050353WithNewTable() {
         { est: 1, tipo: "Escaner Digitalizador", marca: "Xerox", modelo: "LEX COMBO", serie: "06CUQ30558", inv: "202100013", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Lector QR / Codigo Barras", marca: "Nextep", modelo: "NE-503", serie: "22030448", inv: "22-22030448", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
 
-        // Estación 2
         { est: 2, tipo: "Laptop", marca: "Lenovo", modelo: "THINK PAD", serie: "PW0ADNNB", inv: "22-PW0ADNNB", cpuVinc: "", lente: "", docking: "ZVQ1GEFW", estado: "Operativo", obs: "Estacion 2" },
         { est: 2, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 2, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-500B", serie: "3LZT001600", inv: "22-FALTA DATO01", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2 - Inv. pendiente: 22-FALTA DATO01" },
@@ -2211,7 +2237,6 @@ async function replaceMac050353WithNewTable() {
         { est: 2, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA107K", inv: "893586", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
         { est: 2, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "QCPASS", serie: "92770093", inv: "22-893586", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
 
-        // Estación 3
         { est: 3, tipo: "Laptop", marca: "Lenovo", modelo: "THINK PAD", serie: "PW0ADNN7", inv: "22-PW0ADNN7", cpuVinc: "", lente: "", docking: "FALTA DATO", estado: "Operativo", obs: "Estacion 3 - Docking pendiente" },
         { est: 3, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 3, tipo: "Pad de Firmas", marca: "Generico", modelo: "FALTA DATO", serie: "FALTA DATO-050353-E3", inv: "FALTA DATO", cpuVinc: "", lente: "", docking: "", estado: "En Revision", obs: "Estacion 3 - Datos pendientes (FALTA DATO)" },
@@ -2242,7 +2267,6 @@ async function replaceMac050353WithNewTable() {
 
 async function replaceMac050354WithNewTable() {
     const table050354 = [
-        // Estación 0
         { est: 0, tipo: "Laptop", marca: "Lenovo", modelo: "Lenovo", serie: "PW-0ADNMX", inv: "22-PW-0ADNMX", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "542076008407", inv: "1938483", cpuVinc: "", lente: "1839000909", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006290", inv: "20210771", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
@@ -2251,7 +2275,6 @@ async function replaceMac050354WithNewTable() {
         { est: 0, tipo: "Escaner Digitalizador", marca: "Xerox", modelo: "duplex combo CSANNR", serie: "06CUQ30488", inv: "202100012", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
         { est: 0, tipo: "Lector QR / Codigo Barras", marca: "Nextep", modelo: "NE-503", serie: "22030449", inv: "20220136", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 0" },
 
-        // Estación 1
         { est: 1, tipo: "Laptop", marca: "Lenovo", modelo: "Lenovo", serie: "PW-0ADNSE", inv: "22-PW-0ADNSE", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 1, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006286", inv: "20210772", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
@@ -2260,7 +2283,6 @@ async function replaceMac050354WithNewTable() {
         { est: 1, tipo: "Escaner Digitalizador", marca: "Xerox", modelo: "duplex combo CSANNR", serie: "06CUQ30601", inv: "202100014", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
         { est: 1, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "92770108", inv: "22-92770108", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 1" },
 
-        // Estación 2
         { est: 2, tipo: "Laptop", marca: "Lenovo", modelo: "Lenovo", serie: "PW-0ADNVL", inv: "22-PW-0ADNVL", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
         { est: 2, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", docking: "", estado: "No Aplica", obs: "" },
         { est: 2, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-500B", serie: "3LZT001758", inv: "850727", cpuVinc: "", lente: "", docking: "", estado: "Operativo", obs: "Estacion 2" },
@@ -2608,13 +2630,13 @@ Object.assign(window, {
     deleteComponent,
     renderAdminInventoryGrouped,
     onStockStatusChange,
+    onStockDesincChange,
     openStockModal,
     editStockById,
     saveStockFromModal,
     deleteStockItem,
     renderAdminStockTable,
     loadInitialStock050351,
-    loadInitialStock500351: loadInitialStock050351,
     exportStockExcel,
     onOpRegModuloChange,
     updateOpRoleHint,
