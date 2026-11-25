@@ -7,28 +7,28 @@
 body {
     background-color: #f1f5f9;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    font-size: 8px;
+    font-size: 10px;
     color: #1e293b;
 }
 
-/* Jerarquía tipográfica solicitada: Títulos 10px, textos generales 8px */
+/* Jerarquía tipográfica: Títulos 12px, textos generales 10px (+2px) */
 h1, h2, h3, h4, h5, h6,
 .h1, .h2, .h3, .h4, .h5, .h6,
 .navbar-brand span,
 .modal-title,
 .card-title {
-    font-size: 10px !important;
+    font-size: 12px !important;
     font-weight: 700;
 }
 
 p, span, div, label, input, select, textarea, button, a,
 .btn, .form-control, .form-select, .badge, .nav-link,
 .table, .table th, .table td, .alert, .small, small {
-    font-size: 8px !important;
+    font-size: 10px !important;
 }
 
 .login-wrapper {
-    min-height: calc(100vh - 28px);
+    min-height: calc(100vh - 32px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -100,8 +100,8 @@ p, span, div, label, input, select, textarea, button, a,
 }
 
 .avatar-table {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     object-fit: cover;
     cursor: pointer;
@@ -109,8 +109,8 @@ p, span, div, label, input, select, textarea, button, a,
 }
 
 .img-thumb {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     object-fit: cover;
     border-radius: 6px;
     cursor: pointer;
@@ -122,9 +122,9 @@ p, span, div, label, input, select, textarea, button, a,
     background-color: var(--ine-dark);
     color: #cbd5e1;
     border-top: 2px solid var(--ine-pink);
-    padding: 7px 16px;
+    padding: 8px 16px;
     text-align: center;
-    font-size: 8px !important;
+    font-size: 10px !important;
 }
 
 /* Formato imprimible (Hoja de Servicio) */
@@ -137,11 +137,11 @@ p, span, div, label, input, select, textarea, button, a,
 }
 
 .print-sheet h5 {
-    font-size: 11px !important;
+    font-size: 13px !important;
 }
 
 .print-sheet div, .print-sheet p, .print-sheet span, .print-sheet small, .print-sheet strong {
-    font-size: 9px !important;
+    font-size: 11px !important;
 }
 
 .print-box {
