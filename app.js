@@ -10,7 +10,7 @@ const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/20
 const DEFAULT_STATE = {
     version_esquema: SCHEMA_VERSION,
     estaciones: { "050351": 8, "050353": 2, "050354": 2 },
-    marcas: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Wacom", "Suprema", "Morpho", "Xerox", "Samsung", "Nextep", "ImageTeam", "Syble", "Brother", "NO APLICA", "Generico"],
+    marcas: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Wacom", "Suprema", "Morpho", "Xerox", "Samsung", "Nextep", "ImageTeam", "Syble", "Brother", "Datalogic", "NO APLICA", "Generico"],
     tipos_componente: [
         "Computadora / CPU",
         "Laptop",
@@ -42,7 +42,7 @@ let currentCompPhoto = "";
 let currentOpPhoto = "";
 let currentFaultPhoto = "";
 
-// ==================== MIGRACIÓN A NOMBRES NORMALIZADOS (SIN ACENTOS, Ñ, ESPACIOS NI MAYÚSCULAS) ====================
+// ==================== MIGRACIÓN A NOMBRES NORMALIZADOS ====================
 function normalizeComponentRecord(raw = {}) {
     return {
         id: String(raw.id || "CMP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
@@ -54,6 +54,7 @@ function normalizeComponentRecord(raw = {}) {
         numero_serie: String(raw.numero_serie ?? raw.serie ?? "").trim().toUpperCase(),
         inventario_ine: String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
         serie_cpu_vinculada: String(raw.serie_cpu_vinculada ?? raw.serieCpuVinculada ?? "").trim().toUpperCase(),
+        serie_lente: String(raw.serie_lente ?? raw.serieLente ?? "").trim().toUpperCase(),
         estado_fisico: String(raw.estado_fisico ?? raw.estado ?? "Operativo").trim(),
         observaciones: String(raw.observaciones ?? raw.notas ?? "").trim(),
         foto_url: String(raw.foto_url ?? raw.foto ?? ""),
@@ -129,7 +130,7 @@ function migrateStateToV2(raw = {}) {
     return { migratedState, needsCloudSync };
 }
 
-// ==================== ÍCONOS Y VINCULACIÓN CPU <-> MONITOR ====================
+// ==================== ÍCONOS Y VINCULACIONES (CPU <-> MONITOR Y LENTE) ====================
 function getComponentIcon(tipo) {
     const t = String(tipo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (t.includes("laptop") || t.includes("portatil")) return "bi-laptop";
@@ -154,6 +155,11 @@ function isMonitorType(tipo) {
 function isCpuType(tipo) {
     const t = String(tipo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return t.includes("computadora") || t.includes("cpu") || t.includes("pc") || t.includes("servidor") || t.includes("laptop");
+}
+
+function isCameraType(tipo) {
+    const t = String(tipo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return t.includes("camara");
 }
 
 function getAvailableCpusForStation(modulo, estacion) {
@@ -206,6 +212,26 @@ function onCompCpuSelectChange() {
     const selVal = document.getElementById("compCpuSelect").value;
     if (selVal) {
         document.getElementById("compSerieCpuVinculada").value = selVal;
+    }
+}
+
+function updateLensFieldVisibility(currentLensValue = "") {
+    const tipo = document.getElementById("compTipo").value;
+    const container = document.getElementById("compLensLinkContainer");
+    const inputEl = document.getElementById("compSerieLente");
+
+    if (!container || !inputEl) return;
+
+    if (!isCameraType(tipo)) {
+        container.classList.add("d-none");
+        inputEl.value = "";
+        return;
+    }
+
+    container.classList.remove("d-none");
+    const valUpper = String(currentLensValue || inputEl.value || "").trim().toUpperCase();
+    if (valUpper) {
+        inputEl.value = valUpper;
     }
 }
 
@@ -341,6 +367,7 @@ function applyModalBrandLockState() {
 function onModalBrandOrTypeChange() {
     applyModalBrandLockState();
     updateCpuLinkSelector();
+    updateLensFieldVisibility();
 }
 
 function openComponentModal(context = "admin", compToEdit = null) {
@@ -377,6 +404,8 @@ function openComponentModal(context = "admin", compToEdit = null) {
         document.getElementById("compInventarioIne").value = compToEdit.inventario_ine || "";
         const cpuInput = document.getElementById("compSerieCpuVinculada");
         if (cpuInput) cpuInput.value = compToEdit.serie_cpu_vinculada || "";
+        const lensInput = document.getElementById("compSerieLente");
+        if (lensInput) lensInput.value = compToEdit.serie_lente || "";
         document.getElementById("compEstado").value = compToEdit.estado_fisico;
         document.getElementById("compNotas").value = compToEdit.observaciones || "";
 
@@ -389,6 +418,8 @@ function openComponentModal(context = "admin", compToEdit = null) {
         document.getElementById("editCompId").value = "";
         const cpuInput = document.getElementById("compSerieCpuVinculada");
         if (cpuInput) cpuInput.value = "";
+        const lensInput = document.getElementById("compSerieLente");
+        if (lensInput) lensInput.value = "";
         document.getElementById("compModalTitle").innerHTML = context === "op"
             ? `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estacion`
             : `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en Estacion`;
@@ -396,6 +427,7 @@ function openComponentModal(context = "admin", compToEdit = null) {
 
     applyModalBrandLockState();
     updateCpuLinkSelector(compToEdit ? compToEdit.serie_cpu_vinculada : "");
+    updateLensFieldVisibility(compToEdit ? compToEdit.serie_lente : "");
     new bootstrap.Modal(document.getElementById("componentModal")).show();
 }
 
@@ -414,6 +446,9 @@ async function saveComponentFromModal(e) {
     const inventario_ine = document.getElementById("compInventarioIne").value.trim().toUpperCase();
     const serie_cpu_vinculada = isMonitorType(tipo_componente)
         ? (document.getElementById("compSerieCpuVinculada")?.value || "").trim().toUpperCase()
+        : "";
+    const serie_lente = isCameraType(tipo_componente)
+        ? (document.getElementById("compSerieLente")?.value || "").trim().toUpperCase()
         : "";
     const estado_fisico = document.getElementById("compEstado").value;
     const observaciones = document.getElementById("compNotas").value.trim();
@@ -437,6 +472,7 @@ async function saveComponentFromModal(e) {
                 numero_serie,
                 inventario_ine,
                 serie_cpu_vinculada,
+                serie_lente,
                 estado_fisico,
                 observaciones,
                 foto_url: currentCompPhoto || appState.componentes[idx].foto_url,
@@ -454,6 +490,7 @@ async function saveComponentFromModal(e) {
             numero_serie,
             inventario_ine,
             serie_cpu_vinculada,
+            serie_lente,
             estado_fisico,
             observaciones,
             foto_url: currentCompPhoto,
@@ -531,6 +568,9 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                             : ""}
                                         ${linkedMonitors.length
                                             ? `<div class="text-info-emphasis mt-1 fw-normal"><i class="bi bi-display"></i>Monitor: <strong class="font-monospace">${linkedMonitors.map(m => m.numero_serie).join(", ")}</strong></div>`
+                                            : ""}
+                                        ${isCameraType(c.tipo_componente) && c.serie_lente
+                                            ? `<div class="text-secondary mt-1 fw-normal"><i class="bi bi-camera-reels"></i>Lente: <strong class="font-monospace">${c.serie_lente}</strong></div>`
                                             : ""}
                                     </td>
                                     ${showLocation ? `
@@ -1010,12 +1050,14 @@ function onAdminCompModuloChange() {
     updateCompAssignedOperatorHint();
     applyModalBrandLockState();
     updateCpuLinkSelector();
+    updateLensFieldVisibility();
 }
 
 function onAdminStationOrBrandChange() {
     updateCompAssignedOperatorHint();
     applyModalBrandLockState();
     updateCpuLinkSelector();
+    updateLensFieldVisibility();
 }
 
 function updateCompAssignedOperatorHint() {
@@ -1053,7 +1095,7 @@ function renderAdminInventoryGrouped() {
             const op = getOperatorByStation(c.modulo, c.estacion);
             const opName = op ? op.nombre_completo.toLowerCase() : "";
             const estText = formatStationLabel(c.estacion).toLowerCase();
-            const haystack = `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.marca} ${c.modelo} ${c.tipo_componente} ${c.estado_fisico} ${opName} ${estText}`.toLowerCase();
+            const haystack = `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.serie_lente || ""} ${c.marca} ${c.modelo} ${c.tipo_componente} ${c.estado_fisico} ${opName} ${estText}`.toLowerCase();
             if (!haystack.includes(search)) return false;
         }
         return true;
@@ -1572,44 +1614,176 @@ function closeScanner() {
     if (modalInstance) modalInstance.hide();
 }
 
+// ==================== CARGA RÁPIDA DE TABLA MAC 050351 ====================
+async function replaceMac050351WithNewTable() {
+    const table050351 = [
+        // Estación 0
+        { est: 0, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "J101CBVA", inv: "22-J101CBVA", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 0" },
+        { est: 0, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 01", inv: "22-FALTA DATO 01", cpuVinc: "J101CBVA", lente: "", estado: "En Revision", obs: "Estacion 0 - Serie pendiente" },
+        { est: 0, tipo: "Camara Fotografica", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", estado: "No Aplica", obs: "Estacion 0" },
+        { est: 0, tipo: "Pad de Firmas", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", estado: "No Aplica", obs: "Estacion 0" },
+        { est: 0, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939581299", inv: "971977", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 0" },
+        { est: 0, tipo: "Impresora", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000TEN", inv: "22-882385", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 0" },
+        { est: 0, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", estado: "No Aplica", obs: "Estacion 0" },
+        { est: 0, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "9286360", inv: "22-9286360", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 0" },
+
+        // Estación 1
+        { est: 1, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XB6", inv: "22-MZ006XB6", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 1" },
+        { est: 1, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "1563EBMARZLAVNAA5DYL", inv: "22-A5DYL", cpuVinc: "MZ006XB6", lente: "", estado: "Operativo", obs: "Estacion 1" },
+        { est: 1, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072002447", inv: "22-1119350", cpuVinc: "", lente: "7797051400", estado: "Operativo", obs: "Estacion 1" },
+        { est: 1, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006261", inv: "20210763", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 1" },
+        { est: 1, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939653071", inv: "1498521", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 1" },
+        { est: 1, tipo: "Impresora", marca: "Brother", modelo: "HL-L6400DW", serie: "U64185C3N148105", inv: "C-2023-0127", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 1" },
+        { est: 1, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN78GAIOMF", inv: "920941", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 1" },
+        { est: 1, tipo: "Lector QR / Codigo Barras", marca: "Nextep", modelo: "NE-503", serie: "22030479", inv: "C-INE-084-2022-0131", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 1" },
+
+        // Estación 2
+        { est: 2, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006X9G", inv: "22-MZ006X9G", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 2" },
+        { est: 2, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "1563EBMAR2LVNAA7BXD", inv: "22-7BXD", cpuVinc: "MZ006X9G", lente: "", estado: "Operativo", obs: "Estacion 2" },
+        { est: 2, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072035453", inv: "22-1119352", cpuVinc: "", lente: "7897038386", estado: "Operativo", obs: "Estacion 2" },
+        { est: 2, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ00210006264", inv: "20210764", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 2" },
+        { est: 2, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939591234", inv: "1025911", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 2" },
+        { est: 2, tipo: "Impresora", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592971", inv: "22-1120418", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 2" },
+        { est: 2, tipo: "Escaner Digitalizador", marca: "Xerox", modelo: "Duplex Combo", serie: "06CUQ30426", inv: "EM-000360", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 2" },
+        { est: 2, tipo: "Lector QR / Codigo Barras", marca: "Datalogic", modelo: "Quickscan QW2100", serie: "G13H03190", inv: "22-G13H03190", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 2" },
+
+        // Estación 3
+        { est: 3, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XB5", inv: "22-MZ006XB5", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 3" },
+        { est: 3, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 01-E3", inv: "22-FALTA DATO 01", cpuVinc: "MZ006XB5", lente: "", estado: "En Revision", obs: "Estacion 3 - Serie original: FALTA DATO 01" },
+        { est: 3, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072003396", inv: "22-1119351", cpuVinc: "", lente: "7797057314", estado: "Operativo", obs: "Estacion 3" },
+        { est: 3, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ00210006263", inv: "20210765", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 3" },
+        { est: 3, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939581300", inv: "971978", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 3" },
+        { est: 3, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", estado: "No Aplica", obs: "Estacion 3" },
+        { est: 3, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN77UA10MD", inv: "915529", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 3" },
+        { est: 3, tipo: "Lector QR / Codigo Barras", marca: "Datalogic", modelo: "Quickscan QW2100", serie: "G13H03199", inv: "22-G13H03199", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 3" },
+
+        // Estación 4
+        { est: 4, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XCH", inv: "22-MZ006XCH", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 4" },
+        { est: 4, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 02", inv: "22-FALTA DATO 02", cpuVinc: "MZ006XCH", lente: "", estado: "En Revision", obs: "Estacion 4 - Serie pendiente" },
+        { est: 4, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "542076008381", inv: "22-1938463", cpuVinc: "", lente: "1839000871", estado: "Operativo", obs: "Estacion 4" },
+        { est: 4, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006262", inv: "20210767", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 4" },
+        { est: 4, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939581303", inv: "971977", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 4" },
+        { est: 4, tipo: "Impresora", marca: "Brother", modelo: "HL-L6400DW", serie: "U64185C3N146921", inv: "C-2023-0127", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 4" },
+        { est: 4, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN77UA10MB", inv: "915928", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 4" },
+        { est: 4, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "92868361", inv: "22-92868361", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 4" },
+
+        // Estación 5
+        { est: 5, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006XC2", inv: "22-MZ006XC2", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 5" },
+        { est: 5, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 03", inv: "22-FALTA DATO 03", cpuVinc: "MZ006XC2", lente: "", estado: "En Revision", obs: "Estacion 5 - Serie pendiente" },
+        { est: 5, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "542076008341", inv: "22-1938423", cpuVinc: "", lente: "1839003531", estado: "Operativo", obs: "Estacion 5" },
+        { est: 5, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006265", inv: "20210766", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 5" },
+        { est: 5, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939653070", inv: "1498520", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 5" },
+        { est: 5, tipo: "Impresora", marca: "Brother", modelo: "HL-L6400DW", serie: "U64185C3N148136", inv: "C-2023-0125", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 5" },
+        { est: 5, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN77UA10RB", inv: "915530", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 5" },
+        { est: 5, tipo: "Lector QR / Codigo Barras", marca: "Datalogic", modelo: "Quickscan QW2100", serie: "G13H03198", inv: "22-G13H03198", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 5" },
+
+        // Estación 6
+        { est: 6, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006X8C", inv: "22-MZ006X8C", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 6" },
+        { est: 6, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 04", inv: "22-FALTA DATO 04", cpuVinc: "MZ006X8C", lente: "", estado: "En Revision", obs: "Estacion 6 - Serie pendiente" },
+        { est: 6, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T7", serie: "182072002426", inv: "22-1119353", cpuVinc: "", lente: "7797051361", estado: "Operativo", obs: "Estacion 6" },
+        { est: 6, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ002100777", inv: "20220020", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 6" },
+        { est: 6, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939591235", inv: "1025912", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 6" },
+        { est: 6, tipo: "Impresora", marca: "Brother", modelo: "HL-L6200DW", serie: "U64185G9N592966", inv: "22-1120407", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 6" },
+        { est: 6, tipo: "Escaner Digitalizador", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA1086", inv: "893584", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 6" },
+        { est: 6, tipo: "Lector QR / Codigo Barras", marca: "Nextep", modelo: "NE-503", serie: "22030471", inv: "C-INE-084-2022-0129", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 6" },
+
+        // Estación 7
+        { est: 7, tipo: "Computadora / CPU", marca: "Lenovo", modelo: "LENOVO", serie: "MZ006X9Z", inv: "22-MZ006X9Z", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 7" },
+        { est: 7, tipo: "Monitor", marca: "Lenovo", modelo: "ThinkVision", serie: "FALTA DATO 05", inv: "22-FALTA DATO 05", cpuVinc: "MZ006X9Z", lente: "", estado: "En Revision", obs: "Estacion 7 - Serie pendiente" },
+        { est: 7, tipo: "Camara Fotografica", marca: "Canon", modelo: "EOS REBEL T8", serie: "542076008365", inv: "22-1938446", cpuVinc: "", lente: "1839003590", estado: "Operativo", obs: "Estacion 7" },
+        { est: 7, tipo: "Pad de Firmas", marca: "Wacom", modelo: "STU-540", serie: "1AQ0021006289", inv: "20220026", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 7" },
+        { est: 7, tipo: "Escaner de Huellas", marca: "Suprema", modelo: "REALSCAN.G10", serie: "939681297", inv: "971976", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 7" },
+        { est: 7, tipo: "Impresora", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", estado: "No Aplica", obs: "Estacion 7" },
+        { est: 7, tipo: "Escaner Digitalizador", marca: "NO APLICA", modelo: "NO APLICA", serie: "NO APLICA", inv: "NO APLICA", cpuVinc: "", lente: "", estado: "No Aplica", obs: "Estacion 7" },
+        { est: 7, tipo: "Lector QR / Codigo Barras", marca: "Syble", modelo: "SYBLE", serie: "92770092", inv: "22-92770092", cpuVinc: "", lente: "", estado: "Operativo", obs: "Estacion 7" }
+    ];
+
+    const otherModulesComponents = appState.componentes.filter(c => c.modulo !== "050351");
+
+    const new050351Components = table050351.map((item, idx) => {
+        const isNa = item.serie.toUpperCase() === "NO APLICA";
+        const tag = item.tipo
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^A-Za-z0-9]/g, "")
+            .toUpperCase()
+            .slice(0, 8);
+        const serieFinal = isNa ? `NA-050351-E${item.est}-${tag}-${idx + 1}` : item.serie;
+
+        return normalizeComponentRecord({
+            id: `CMP-050351-E${item.est}-${idx + 1}-${Date.now()}`,
+            modulo: "050351",
+            estacion: item.est,
+            tipo_componente: item.tipo,
+            marca: item.marca,
+            modelo: item.modelo,
+            numero_serie: serieFinal,
+            inventario_ine: item.inv === "NO APLICA" ? "" : item.inv,
+            serie_cpu_vinculada: isMonitorType(item.tipo) ? item.cpuVinc : "",
+            serie_lente: isCameraType(item.tipo) ? item.lente : "",
+            estado_fisico: item.estado,
+            observaciones: item.obs,
+            registrado_por: "Carga Tabla 050351",
+            fecha_registro: new Date().toLocaleString("es-MX")
+        });
+    });
+
+    appState.estaciones["050351"] = Math.max(7, Number(appState.estaciones["050351"] ?? 7));
+    new050351Components.forEach(c => {
+        if (c.marca && !appState.marcas.some(m => m.toLowerCase() === c.marca.toLowerCase())) {
+            appState.marcas.push(c.marca);
+        }
+        if (c.tipo_componente && !appState.tipos_componente.some(t => t.toLowerCase() === c.tipo_componente.toLowerCase())) {
+            appState.tipos_componente.push(c.tipo_componente);
+        }
+    });
+
+    appState.componentes = [...otherModulesComponents, ...new050351Components];
+    await saveState();
+    if (currentUser && currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
+    alert(`Listo: se cargaron ${new050351Components.length} registros del MAC 050351 (Estaciones 0 a 7).`);
+}
+
 // ==================== PLANTILLA, IMPORTACIÓN Y EXPORTACIÓN EXCEL (.XLSX / .CSV) ====================
 function downloadImportTemplate() {
     const sampleRows = [
         {
             "modulo": "050351",
             "estacion": 0,
-            "tipo_componente": "Servidor",
-            "marca": "Dell",
-            "modelo": "PowerEdge",
-            "numero_serie": "J101CBVA",
-            "inventario_ine": "",
-            "serie_cpu_vinculada": "",
-            "estado_fisico": "Operativo",
-            "observaciones": "Servidor 050351"
-        },
-        {
-            "modulo": "050351",
-            "estacion": 1,
             "tipo_componente": "Computadora / CPU",
-            "marca": "Dell",
-            "modelo": "OptiPlex",
-            "numero_serie": "CPU001TEST",
-            "inventario_ine": "",
+            "marca": "Lenovo",
+            "modelo": "LENOVO",
+            "numero_serie": "J101CBVA",
+            "inventario_ine": "22-J101CBVA",
             "serie_cpu_vinculada": "",
+            "serie_lente": "",
             "estado_fisico": "Operativo",
-            "observaciones": "Cliente 1"
+            "observaciones": "Estacion 0"
         },
         {
             "modulo": "050351",
             "estacion": 1,
             "tipo_componente": "Monitor",
-            "marca": "Dell",
-            "modelo": "P2222H",
-            "numero_serie": "MON001TEST",
-            "inventario_ine": "",
-            "serie_cpu_vinculada": "CPU001TEST",
+            "marca": "Lenovo",
+            "modelo": "ThinkVision",
+            "numero_serie": "1563EBMARZLAVNAA5DYL",
+            "inventario_ine": "22-A5DYL",
+            "serie_cpu_vinculada": "MZ006XB6",
+            "serie_lente": "",
             "estado_fisico": "Operativo",
-            "observaciones": "Monitor vinculado a CPU001TEST"
+            "observaciones": "Estacion 1"
+        },
+        {
+            "modulo": "050351",
+            "estacion": 1,
+            "tipo_componente": "Camara Fotografica",
+            "marca": "Canon",
+            "modelo": "EOS REBEL T7",
+            "numero_serie": "182072002447",
+            "inventario_ine": "22-1119350",
+            "serie_cpu_vinculada": "",
+            "serie_lente": "7797051400",
+            "estado_fisico": "Operativo",
+            "observaciones": "Estacion 1"
         }
     ];
 
@@ -1617,7 +1791,8 @@ function downloadImportTemplate() {
     const ws = XLSX.utils.json_to_sheet(sampleRows);
     ws["!cols"] = [
         { wch: 10 }, { wch: 10 }, { wch: 24 }, { wch: 15 },
-        { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 25 }
+        { wch: 20 }, { wch: 24 }, { wch: 18 }, { wch: 22 },
+        { wch: 18 }, { wch: 14 }, { wch: 25 }
     ];
     XLSX.utils.book_append_sheet(wb, ws, "plantilla_importacion");
     XLSX.writeFile(wb, "plantilla_importacion_macs.xlsx");
@@ -1661,6 +1836,7 @@ async function importInventoryExcel(event) {
             const modelo = String(raw["modelo"] ?? raw["Modelo"] ?? (marca === "NO APLICA" ? "NO APLICA" : "N/A")).trim() || "N/A";
             const inventario_ine = String(raw["inventario_ine"] ?? raw["InventarioINE"] ?? raw["Inventario INE"] ?? "").trim().toUpperCase();
             const serie_cpu_vinculada = String(raw["serie_cpu_vinculada"] ?? raw["SerieCpuVinculada"] ?? "").trim().toUpperCase();
+            const serie_lente = String(raw["serie_lente"] ?? raw["SerieLente"] ?? "").trim().toUpperCase();
             const observaciones = String(raw["observaciones"] ?? raw["Notas"] ?? "").trim();
 
             let numero_serie = String(raw["numero_serie"] ?? raw["Serie"] ?? raw["Número de Serie"] ?? "").trim().toUpperCase();
@@ -1708,6 +1884,7 @@ async function importInventoryExcel(event) {
                 numero_serie,
                 inventario_ine,
                 serie_cpu_vinculada: isMonitorType(tipo_componente) ? serie_cpu_vinculada : "",
+                serie_lente: isCameraType(tipo_componente) ? serie_lente : "",
                 estado_fisico,
                 observaciones,
                 foto_url: "",
@@ -1757,6 +1934,7 @@ function exportInventoryExcel() {
             "numero_serie": c.numero_serie,
             "inventario_ine": c.inventario_ine || "",
             "serie_cpu_vinculada": c.serie_cpu_vinculada || "",
+            "serie_lente": c.serie_lente || "",
             "estado_fisico": c.estado_fisico,
             "registrado_por": c.registrado_por || "Administrador",
             "observaciones": c.observaciones || "",
@@ -1768,8 +1946,9 @@ function exportInventoryExcel() {
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
         { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 28 }, { wch: 16 },
-        { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 22 },
-        { wch: 20 }, { wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 25 }, { wch: 20 }
+        { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 24 },
+        { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 22 },
+        { wch: 25 }, { wch: 20 }
     ];
     XLSX.utils.book_append_sheet(wb, ws, "inventario_componentes");
 
@@ -1868,6 +2047,7 @@ Object.assign(window, {
     openPrintFaultFormat,
     openScanner,
     closeScanner,
+    replaceMac050351WithNewTable,
     previewImageFile,
     clearImageField,
     showPhotoModal,
