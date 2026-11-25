@@ -214,7 +214,7 @@
             <!-- Formulario Login Administrador -->
             <form id="adminLoginForm" class="d-none" onsubmit="loginAsAdmin(event)">
                 <div class="alert alert-secondary small py-2">
-                    <i class="bi bi-info-circle me-1"></i>Acceso exclusivo para control global, estaciones, stock, operadores y tickets de falla.
+                    <i class="bi bi-info-circle me-1"></i>Acceso exclusivo para control global, estaciones, stock, traspasos, operadores y tickets de falla.
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Contraseña de Administrador</label>
@@ -387,6 +387,11 @@
                     </button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link" id="adm-tab-traspasos" onclick="switchAdminTab('traspasos')">
+                        <i class="bi bi-arrow-left-right me-1"></i>Traspasos y Reasignación
+                    </button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link" id="adm-tab-operadores" onclick="switchAdminTab('operadores')">
                         <i class="bi bi-people me-1"></i>Operadores y Responsables
                     </button>
@@ -539,7 +544,128 @@
                 </div>
             </div>
 
-            <!-- TAB 3: OPERADORES Y RESPONSABLES -->
+            <!-- TAB 3: TRASPASOS Y REASIGNACIÓN -->
+            <div id="admSectionTraspasos" class="d-none">
+                <div class="row g-4">
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-header bg-white py-3">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-arrow-left-right text-danger me-2"></i>Reasignar o Traspasar Equipo</h6>
+                            </div>
+                            <div class="card-body">
+                                <form id="transferForm" onsubmit="submitDirectTransfer(event)">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">1. Filtrar Origen por Módulo</label>
+                                        <select id="trSourceModulo" class="form-select" onchange="onTransferSourceChange()">
+                                            <option value="ALL">Todos los Módulos</option>
+                                            <option value="050351">Módulo 050351</option>
+                                            <option value="050353">Módulo 050353</option>
+                                            <option value="050354">Módulo 050354</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">2. Componente Asignado a Traspasar *</label>
+                                        <select id="trComponentSelect" class="form-select" onchange="onTransferComponentSelected()" required></select>
+                                        <small id="trCurrentAssignmentHint" class="text-muted d-block mt-1"></small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">3. Tipo de Movimiento *</label>
+                                        <select id="trActionType" class="form-select" onchange="onTransferActionChange()" required>
+                                            <option value="station">Reasignar a Usuario / Estación (Mismo o distinto MAC)</option>
+                                            <option value="stock">Enviar a Stock / Resguardo / Desincorporación</option>
+                                        </select>
+                                    </div>
+
+                                    <div id="trStationTargetBox" class="p-3 rounded-3 bg-light border mb-3">
+                                        <div class="mb-2">
+                                            <label class="form-label fw-semibold small mb-1">Módulo Destino *</label>
+                                            <select id="trTargetModulo" class="form-select form-select-sm" onchange="onTransferTargetModuloChange()">
+                                                <option value="050351">Módulo 050351</option>
+                                                <option value="050353">Módulo 050353</option>
+                                                <option value="050354">Módulo 050354</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label fw-semibold small mb-1">Estación / Usuario Destino *</label>
+                                            <select id="trTargetEstacion" class="form-select form-select-sm" onchange="updateTransferTargetHint()"></select>
+                                            <small id="trTargetOperatorHint" class="fw-semibold d-block mt-1"></small>
+                                        </div>
+                                    </div>
+
+                                    <div id="trStockTargetBox" class="p-3 rounded-3 bg-light border mb-3 d-none">
+                                        <div class="row g-2">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold small mb-1">Destino *</label>
+                                                <input type="text" id="trStockDestino" class="form-control form-control-sm" value="Stock / Resguardo" placeholder="Ej. Bodega / MAC 050353">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold small mb-1">Estatus *</label>
+                                                <select id="trStockEstatus" class="form-select form-select-sm" onchange="onTrStockStatusChange()">
+                                                    <option value="Stock">Stock</option>
+                                                    <option value="Falla">Falla</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold small mb-1">Desincorporación</label>
+                                                <select id="trStockDesinc" class="form-select form-select-sm">
+                                                    <option value="No">No</option>
+                                                    <option value="Si">Si</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold small mb-1">Fecha Desinc.</label>
+                                                <input type="date" id="trStockFecha" class="form-control form-control-sm">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label fw-semibold small mb-1">Oficio de Desincorporación / Traspaso</label>
+                                                <input type="text" id="trStockOficio" class="form-control form-control-sm text-uppercase" placeholder="Ej. INE/JDE03/VRFE/0045/2026">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Motivo / Observaciones del Traspaso *</label>
+                                        <input type="text" id="trMotivo" class="form-control" required placeholder="Ej. Reasignación por apoyo operativo / Equipo ya no se utiliza">
+                                    </div>
+
+                                    <button type="submit" class="btn btn-pink w-100 fw-semibold">
+                                        <i class="bi bi-send-check me-1"></i>Ejecutar Traspaso y Generar Formato
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Historial de Traspasos y Envíos a Stock</h6>
+                                <span id="transferHistoryCount" class="badge bg-secondary">0</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Folio / Fecha</th>
+                                                <th>Equipo / Serie</th>
+                                                <th>De (Origen)</th>
+                                                <th>A (Destino)</th>
+                                                <th class="text-end">Formato</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="transferHistoryTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: OPERADORES Y RESPONSABLES -->
             <div id="admSectionOperadores" class="d-none">
                 <div class="row g-4">
                     <div class="col-lg-4">
@@ -627,7 +753,7 @@
                 </div>
             </div>
 
-            <!-- TAB 4: ESTACIONES Y CATÁLOGOS -->
+            <!-- TAB 5: ESTACIONES Y CATÁLOGOS -->
             <div id="admSectionConfig" class="d-none">
                 <div class="row g-4">
                     <div class="col-lg-6">
@@ -705,7 +831,7 @@
                 </div>
             </div>
 
-            <!-- TAB 5: TICKETS DE FALLA Y SERVICIO -->
+            <!-- TAB 6: TICKETS DE FALLA Y SERVICIO -->
             <div id="admSectionFallas" class="d-none">
                 <div class="card border-0 shadow-sm rounded-3">
                     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -956,6 +1082,65 @@
     </div>
 </div>
 
+<!-- ==================== MODAL ENVIAR A STOCK DESDE ASIGNACIÓN ==================== -->
+<div class="modal fade" id="moveToStockModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-box-arrow-in-down text-warning me-2"></i>Enviar Equipo Asignado a Stock / Resguardo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="moveToStockForm" onsubmit="confirmMoveComponentToStock(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="mtsCompId">
+                    <div class="p-3 rounded-3 bg-light border mb-3">
+                        <div><strong>Equipo:</strong> <span id="mtsCompSummary"></span></div>
+                        <div class="small text-muted mt-1"><strong>Origen actual:</strong> <span id="mtsOriginSummary"></span></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Destino (A dónde se enviará) *</label>
+                            <input type="text" id="mtsDestino" class="form-control" value="Stock / Resguardo" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Estatus *</label>
+                            <select id="mtsEstatus" class="form-select" onchange="onMtsStatusChange()" required>
+                                <option value="Stock">Stock</option>
+                                <option value="Falla">Falla</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Desincorporación *</label>
+                            <select id="mtsDesinc" class="form-select" onchange="onMtsDesincChange()" required>
+                                <option value="No">No</option>
+                                <option value="Si">Si</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Fecha de Desincorporación / Traspaso</label>
+                            <input type="date" id="mtsFecha" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Oficio de Desincorporación / Traspaso</label>
+                            <input type="text" id="mtsOficio" class="form-control text-uppercase" placeholder="Ej. INE/JDE03/VRFE/0045/2026">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Motivo por el que ya no se usa en la estación *</label>
+                            <input type="text" id="mtsMotivo" class="form-control" required placeholder="Ej. Ya no se requiere en la estación / Reemplazo por equipo nuevo">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-pink fw-semibold">
+                        <i class="bi bi-check2-circle me-1"></i>Quitar de Asignación, Pasar a Stock e Imprimir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- ==================== MODAL REPORTAR FALLA ==================== -->
 <div class="modal fade" id="reportFaultModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -1079,7 +1264,7 @@
     </div>
 </div>
 
-<!-- ==================== MODAL IMPRESIÓN HOJA DE SERVICIO ==================== -->
+<!-- ==================== MODAL IMPRESIÓN HOJA DE SERVICIO / TRASPASO ==================== -->
 <div class="modal fade" id="printModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow">
