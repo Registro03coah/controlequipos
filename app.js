@@ -28,7 +28,8 @@ const DEFAULT_STATE = {
     operadores: [],
     componentes: [],
     stock_resguardo: [],
-    tickets_fallas: []
+    tickets_fallas: [],
+    historial_traspasos: []
 };
 
 let appState = loadLocalCache();
@@ -163,6 +164,7 @@ function migrateStateToV2(raw = {}) {
     const componentesRaw = raw.componentes || raw.components || [];
     const stockRaw = raw.stock_resguardo || raw.stock || [];
     const ticketsRaw = raw.tickets_fallas || raw.faults || [];
+    const transfersRaw = raw.historial_traspasos || [];
 
     const hasLegacyStockFields = Array.isArray(stockRaw) && stockRaw.some(s =>
         String(s?.ubicacion || "").trim() === "500351" ||
@@ -186,7 +188,8 @@ function migrateStateToV2(raw = {}) {
         operadores: Array.isArray(operadoresRaw) ? operadoresRaw.map(normalizeOperatorRecord) : [],
         componentes: Array.isArray(componentesRaw) ? componentesRaw.map(normalizeComponentRecord) : [],
         stock_resguardo: Array.isArray(stockRaw) ? stockRaw.map(normalizeStockRecord) : [],
-        tickets_fallas: Array.isArray(ticketsRaw) ? ticketsRaw.map(normalizeFaultTicketRecord) : []
+        tickets_fallas: Array.isArray(ticketsRaw) ? ticketsRaw.map(normalizeFaultTicketRecord) : [],
+        historial_traspasos: Array.isArray(transfersRaw) ? transfersRaw : []
     };
 
     return { migratedState, needsCloudSync };
@@ -604,8 +607,8 @@ async function saveComponentFromModal(e) {
 
     if (isOp) refreshOperatorUI();
     else refreshAdminUI({ preserveSelection: true });
-}
 
+}
 // ==================== RENDERIZADO AGRUPADO POR COMPONENTE CON ÍCONOS ====================
 function groupComponentsByType(list) {
     const map = new Map();
@@ -737,6 +740,9 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                         <div class="d-flex justify-content-end gap-1 flex-wrap">
                                             <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="editComponentById('${c.id}')">
                                                 <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-warning text-dark fw-semibold" title="Quitar de asignacion y enviar a Stock" onclick="openMoveToStockModal('${c.id}')">
+                                                <i class="bi bi-box-arrow-in-down me-1"></i>A Stock
                                             </button>
                                             <button class="btn btn-sm btn-outline-secondary" title="Eliminar" onclick="deleteComponent('${c.id}')">
                                                 <i class="bi bi-trash"></i>
@@ -992,50 +998,6 @@ function renderAdminStockTable() {
     }).join("");
 }
 
-async function loadInitialStock050351() {
-    const initialStockRows = [
-        { origen: "050351", destino: "", inv: "1120405", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592983", lente: "", estatus: "Stock", desinc: "No" },
-        { origen: "050351", destino: "", inv: "1120432", desc: "Impresora laser", marca: "Brother", modelo: "HL-L6200DW", serie: "U64180G9N592940", lente: "", estatus: "Stock", desinc: "No" },
-        { origen: "050351", destino: "", inv: "882374", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000RMM", lente: "", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "882380", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SQM", lente: "", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "882381", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SXN", lente: "", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "882382", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000T1Z", lente: "", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "882384", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJCGC000SGY", lente: "", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "882405", desc: "Impresora laser", marca: "Samsung", modelo: "M4020ND", serie: "ZD7YBJAGC000R7X", lente: "", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "893583", desc: "Escaner de cama plana", marca: "HP", modelo: "SCANJET2500F1", serie: "CN75BA107Q", lente: "", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "698583", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038402", lente: "747048984", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "698584", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038403", lente: "747048985", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "698585", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038405", lente: "747048987", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "698586", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "322174038406", lente: "747048988", estatus: "Falla", desinc: "Si" },
-        { origen: "050351", destino: "", inv: "698588", desc: "Camara digital", marca: "CANON", modelo: "EOS REBEL T3", serie: "352074049589", lente: "1047005158", estatus: "Falla", desinc: "Si" }
-    ];
-
-    const seriesToReplace = new Set(initialStockRows.map(r => r.serie.toUpperCase()));
-    const remainingStock = (appState.stock_resguardo || []).filter(s => !seriesToReplace.has(s.numero_serie));
-
-    const newStockRecords = initialStockRows.map((r, idx) => normalizeStockRecord({
-        id: `STK-050351-${idx + 1}-${Date.now()}`,
-        origen: r.origen,
-        destino: r.destino,
-        inventario_ine: r.inv,
-        descripcion: r.desc,
-        marca: r.marca,
-        modelo: r.modelo,
-        numero_serie: r.serie,
-        serie_lente: r.lente,
-        estatus: r.estatus,
-        desincorporacion: r.desinc,
-        fecha_desincorporacion: "",
-        oficio_desincorporacion: "",
-        observaciones: "",
-        fecha_registro: new Date().toLocaleString("es-MX")
-    }));
-
-    appState.stock_resguardo = [...remainingStock, ...newStockRecords];
-    await saveState();
-    refreshAdminUI({ preserveSelection: true });
-}
-
 function exportStockExcel() {
     const list = appState.stock_resguardo || [];
     if (!list.length) {
@@ -1071,6 +1033,359 @@ function exportStockExcel() {
     XLSX.utils.book_append_sheet(wb, ws, "stock_desincorporacion");
     const fecha = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `stock_desincorporacion_macs_${fecha}.xlsx`);
+}
+
+// ==================== TRASPASOS Y ENVÍO A STOCK DESDE ASIGNACIÓN ====================
+function formatTransferOriginLabel(comp) {
+    const op = getOperatorByStation(comp.modulo, comp.estacion);
+    const userTxt = op ? ` - ${op.nombre_completo}` : "";
+    return `${comp.modulo} / ${formatStationLabel(comp.estacion)}${userTxt}`;
+}
+
+function recordTransferLog({ tipo_movimiento, comp, origen_texto, destino_texto, oficio, motivo }) {
+    if (!Array.isArray(appState.historial_traspasos)) appState.historial_traspasos = [];
+    const num = String(appState.historial_traspasos.length + 1).padStart(3, "0");
+    const folio = `TRP-${comp.modulo}-${new Date().getFullYear()}-${num}`;
+    const entry = {
+        id: "TRP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5),
+        folio_traspaso: folio,
+        fecha: new Date().toLocaleString("es-MX"),
+        tipo_movimiento,
+        tipo_componente: comp.tipo_componente,
+        marca: comp.marca,
+        modelo: comp.modelo,
+        numero_serie: comp.numero_serie,
+        inventario_ine: comp.inventario_ine || "",
+        origen_texto,
+        destino_texto,
+        oficio: oficio || "",
+        motivo: motivo || ""
+    };
+    appState.historial_traspasos.push(entry);
+    return entry;
+}
+
+function openMoveToStockModal(compId) {
+    const comp = appState.componentes.find(c => c.id === compId);
+    if (!comp || isNoAplicaComponent(comp)) return;
+
+    document.getElementById("moveToStockForm").reset();
+    document.getElementById("mtsCompId").value = comp.id;
+    document.getElementById("mtsCompSummary").textContent = `${comp.tipo_componente} - ${comp.marca} ${comp.modelo} (Serie: ${comp.numero_serie})`;
+    document.getElementById("mtsOriginSummary").textContent = formatTransferOriginLabel(comp);
+    document.getElementById("mtsDestino").value = "Stock / Resguardo";
+    document.getElementById("mtsEstatus").value = comp.estado_fisico === "En Falla" ? "Falla" : "Stock";
+    document.getElementById("mtsDesinc").value = comp.estado_fisico === "En Falla" ? "Si" : "No";
+    document.getElementById("mtsFecha").value = "";
+    document.getElementById("mtsOficio").value = "";
+    new bootstrap.Modal(document.getElementById("moveToStockModal")).show();
+}
+
+function onMtsStatusChange() {
+    const est = document.getElementById("mtsEstatus").value;
+    document.getElementById("mtsDesinc").value = est === "Falla" ? "Si" : "No";
+}
+
+async function confirmMoveComponentToStock(e) {
+    e.preventDefault();
+    const compId = document.getElementById("mtsCompId").value;
+    const idx = appState.componentes.findIndex(c => c.id === compId);
+    if (idx === -1) return;
+
+    const comp = appState.componentes[idx];
+    const destino = document.getElementById("mtsDestino").value.trim() || "Stock / Resguardo";
+    const estatus = document.getElementById("mtsEstatus").value;
+    const desincorporacion = document.getElementById("mtsDesinc").value;
+    const fecha_desincorporacion = document.getElementById("mtsFecha").value.trim();
+    const oficio_desincorporacion = document.getElementById("mtsOficio").value.trim().toUpperCase();
+    const motivo = document.getElementById("mtsMotivo").value.trim();
+
+    const origenTexto = formatTransferOriginLabel(comp);
+    const obsFinal = [motivo, comp.observaciones].filter(Boolean).join(" • ");
+
+    appState.componentes.splice(idx, 1);
+    appState.stock_resguardo.push(normalizeStockRecord({
+        id: "STK-" + Date.now(),
+        origen: comp.modulo,
+        destino,
+        inventario_ine: comp.inventario_ine || "",
+        descripcion: comp.tipo_componente,
+        marca: comp.marca,
+        modelo: comp.modelo,
+        numero_serie: comp.numero_serie,
+        serie_lente: comp.serie_lente || "",
+        estatus,
+        desincorporacion,
+        fecha_desincorporacion,
+        oficio_desincorporacion,
+        observaciones: obsFinal,
+        fecha_registro: new Date().toLocaleString("es-MX")
+    }));
+
+    const logEntry = recordTransferLog({
+        tipo_movimiento: "Envío a Stock / Resguardo",
+        comp,
+        origen_texto: origenTexto,
+        destino_texto: `${destino} (${estatus}${desincorporacion === "Si" ? " / Desinc. Sí" : ""})`,
+        oficio: oficio_desincorporacion,
+        motivo
+    });
+
+    await saveState();
+    const modalEl = document.getElementById("moveToStockModal");
+    const inst = bootstrap.Modal.getInstance(modalEl);
+    if (inst) inst.hide();
+
+    if (currentUser?.role === "operator") refreshOperatorUI();
+    else refreshAdminUI({ preserveSelection: true });
+
+    openPrintTransferFormat(logEntry.id);
+}
+
+function renderTransfersPanel() {
+    const srcMod = document.getElementById("trSourceModulo")?.value || "ALL";
+    const sel = document.getElementById("trComponentSelect");
+    if (!sel) return;
+
+    const assignedItems = appState.componentes
+        .filter(c => !isNoAplicaComponent(c) && (srcMod === "ALL" || c.modulo === srcMod))
+        .sort((a, b) => a.modulo.localeCompare(b.modulo) || Number(a.estacion) - Number(b.estacion));
+
+    const prevVal = sel.value;
+    sel.innerHTML = assignedItems.length
+        ? assignedItems.map(c => `<option value="${c.id}">${c.modulo} • ${formatStationLabel(c.estacion)} — ${c.tipo_componente} (${c.numero_serie})</option>`).join("")
+        : `<option value="">No hay componentes asignados en este filtro</option>`;
+
+    if (prevVal && assignedItems.some(i => i.id === prevVal)) sel.value = prevVal;
+
+    const tgtModEl = document.getElementById("trTargetModulo");
+    const tgtEstEl = document.getElementById("trTargetEstacion");
+    if (tgtModEl && tgtEstEl) {
+        const currentEst = tgtEstEl.value || 0;
+        fillStationOptions(tgtEstEl, tgtModEl.value, { selectedValue: currentEst });
+    }
+
+    onTransferComponentSelected();
+    onTransferActionChange();
+    renderTransferHistoryTable();
+}
+
+function onTransferSourceChange() {
+    renderTransfersPanel();
+}
+
+function onTransferComponentSelected() {
+    const id = document.getElementById("trComponentSelect")?.value;
+    const hint = document.getElementById("trCurrentAssignmentHint");
+    if (!hint) return;
+    const comp = appState.componentes.find(c => c.id === id);
+    if (!comp) {
+        hint.textContent = "";
+        return;
+    }
+    hint.textContent = `Asignado actualmente en: ${formatTransferOriginLabel(comp)} • Estado: ${comp.estado_fisico}`;
+}
+
+function onTransferActionChange() {
+    const action = document.getElementById("trActionType")?.value || "station";
+    document.getElementById("trStationTargetBox")?.classList.toggle("d-none", action !== "station");
+    document.getElementById("trStockTargetBox")?.classList.toggle("d-none", action !== "stock");
+    if (action === "station") updateTransferTargetHint();
+}
+
+function onTransferTargetModuloChange() {
+    const mod = document.getElementById("trTargetModulo").value;
+    fillStationOptions(document.getElementById("trTargetEstacion"), mod, { selectedValue: 0 });
+    updateTransferTargetHint();
+}
+
+function updateTransferTargetHint() {
+    const mod = document.getElementById("trTargetModulo")?.value;
+    const est = Number(document.getElementById("trTargetEstacion")?.value ?? 0);
+    const hint = document.getElementById("trTargetOperatorHint");
+    if (!hint || !mod) return;
+    const op = getOperatorByStation(mod, est);
+    hint.textContent = op
+        ? `Usuario destino: ${op.nombre_completo} (${op.correo_institucional})`
+        : "Sin usuario registrado en esta estación destino";
+    hint.className = op ? "text-success d-block mt-1 fw-semibold" : "text-danger d-block mt-1 fw-semibold";
+}
+
+function onTrStockStatusChange() {
+    const est = document.getElementById("trStockEstatus").value;
+    document.getElementById("trStockDesinc").value = est === "Falla" ? "Si" : "No";
+}
+
+async function submitDirectTransfer(e) {
+    e.preventDefault();
+    const compId = document.getElementById("trComponentSelect").value;
+    const idx = appState.componentes.findIndex(c => c.id === compId);
+    if (idx === -1) {
+        alert("Selecciona un componente asignado válido.");
+        return;
+    }
+
+    const comp = appState.componentes[idx];
+    const action = document.getElementById("trActionType").value;
+    const motivo = document.getElementById("trMotivo").value.trim();
+    const origenTexto = formatTransferOriginLabel(comp);
+
+    if (action === "station") {
+        const targetModulo = document.getElementById("trTargetModulo").value;
+        const targetEstacion = Number(document.getElementById("trTargetEstacion").value);
+        if (comp.modulo === targetModulo && Number(comp.estacion) === targetEstacion) {
+            alert("El destino seleccionado es la misma estación y módulo actual.");
+            return;
+        }
+
+        comp.modulo = targetModulo;
+        comp.estacion = targetEstacion;
+        comp.observaciones = [motivo, comp.observaciones].filter(Boolean).join(" • ");
+
+        const logEntry = recordTransferLog({
+            tipo_movimiento: "Reasignación entre Estaciones / MAC",
+            comp,
+            origen_texto: origenTexto,
+            destino_texto: formatTransferOriginLabel(comp),
+            oficio: "",
+            motivo
+        });
+
+        await saveState();
+        document.getElementById("transferForm").reset();
+        refreshAdminUI({ preserveSelection: true });
+        openPrintTransferFormat(logEntry.id);
+    } else {
+        const destino = document.getElementById("trStockDestino").value.trim() || "Stock / Resguardo";
+        const estatus = document.getElementById("trStockEstatus").value;
+        const desincorporacion = document.getElementById("trStockDesinc").value;
+        const fecha_desincorporacion = document.getElementById("trStockFecha").value.trim();
+        const oficio_desincorporacion = document.getElementById("trStockOficio").value.trim().toUpperCase();
+
+        appState.componentes.splice(idx, 1);
+        appState.stock_resguardo.push(normalizeStockRecord({
+            id: "STK-" + Date.now(),
+            origen: comp.modulo,
+            destino,
+            inventario_ine: comp.inventario_ine || "",
+            descripcion: comp.tipo_componente,
+            marca: comp.marca,
+            modelo: comp.modelo,
+            numero_serie: comp.numero_serie,
+            serie_lente: comp.serie_lente || "",
+            estatus,
+            desincorporacion,
+            fecha_desincorporacion,
+            oficio_desincorporacion,
+            observaciones: [motivo, comp.observaciones].filter(Boolean).join(" • "),
+            fecha_registro: new Date().toLocaleString("es-MX")
+        }));
+
+        const logEntry = recordTransferLog({
+            tipo_movimiento: "Envío a Stock / Resguardo",
+            comp,
+            origen_texto: origenTexto,
+            destino_texto: `${destino} (${estatus})`,
+            oficio: oficio_desincorporacion,
+            motivo
+        });
+
+        await saveState();
+        document.getElementById("transferForm").reset();
+        refreshAdminUI({ preserveSelection: true });
+        openPrintTransferFormat(logEntry.id);
+    }
+}
+
+function renderTransferHistoryTable() {
+    const list = appState.historial_traspasos || [];
+    const badge = document.getElementById("transferHistoryCount");
+    if (badge) badge.textContent = list.length;
+
+    const tbody = document.getElementById("transferHistoryTableBody");
+    if (!tbody) return;
+
+    if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Aún no se han registrado traspasos ni envíos a stock.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = list.slice().reverse().map(t => `
+        <tr>
+            <td>
+                <div class="fw-bold font-monospace text-primary">${t.folio_traspaso}</div>
+                <small class="text-muted">${t.fecha}</small>
+            </td>
+            <td>
+                <div class="fw-semibold">${t.tipo_componente}</div>
+                <small class="font-monospace">${t.numero_serie}</small>
+            </td>
+            <td><small>${t.origen_texto}</small></td>
+            <td>
+                <div class="fw-semibold">${t.destino_texto}</div>
+                ${t.oficio ? `<span class="badge bg-light text-dark border font-monospace">Oficio: ${t.oficio}</span>` : ""}
+            </td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-dark" onclick="openPrintTransferFormat('${t.id}')">
+                    <i class="bi bi-printer me-1"></i>Formato
+                </button>
+            </td>
+        </tr>
+    `).join("");
+}
+
+function openPrintTransferFormat(logId) {
+    const t = (appState.historial_traspasos || []).find(item => item.id === logId);
+    if (!t) return;
+
+    document.getElementById("printModalHeaderTitle").innerHTML = `<i class="bi bi-arrow-left-right me-2"></i>Formato de Traspaso - ${t.folio_traspaso}`;
+    document.getElementById("printFormatArea").innerHTML = `
+        <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-2 mb-3">
+            <div>
+                <h5 class="fw-bold mb-0">MÓDULOS DE ATENCIÓN CIUDADANA (050351 • 050353 • 050354)</h5>
+                <div class="fw-semibold text-pink">FORMATO DE TRASPASO / REASIGNACIÓN DE EQUIPO</div>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold text-primary">FOLIO: ${t.folio_traspaso}</div>
+                <div>Fecha: ${t.fecha}</div>
+            </div>
+        </div>
+        <div class="print-box">
+            <div class="print-box-title">1. Movimiento y Origen / Destino</div>
+            <div class="row">
+                <div class="col-12 mb-1"><strong>Tipo de movimiento:</strong> ${t.tipo_movimiento}</div>
+                <div class="col-md-6"><strong>Origen:</strong> ${t.origen_texto}</div>
+                <div class="col-md-6"><strong>Destino:</strong> ${t.destino_texto}</div>
+                ${t.oficio ? `<div class="col-12 mt-1"><strong>Oficio de referencia:</strong> <span class="font-monospace">${t.oficio}</span></div>` : ""}
+            </div>
+        </div>
+        <div class="print-box">
+            <div class="print-box-title">2. Datos del Bien</div>
+            <div class="row">
+                <div class="col-md-6"><strong>Componente:</strong> ${t.tipo_componente}</div>
+                <div class="col-md-6"><strong>Marca / Modelo:</strong> ${t.marca} ${t.modelo}</div>
+                <div class="col-md-6 mt-1"><strong>Serie:</strong> <span class="font-monospace fw-bold">${t.numero_serie}</span></div>
+                <div class="col-md-6 mt-1"><strong>Inventario INE:</strong> ${t.inventario_ine || "—"}</div>
+            </div>
+        </div>
+        <div class="print-box">
+            <div class="print-box-title">3. Motivo / Observaciones</div>
+            <p class="mb-0">${t.motivo || "Sin observaciones"}</p>
+        </div>
+        <div class="row text-center mt-5 pt-3">
+            <div class="col-6">
+                <div style="border-top: 1px solid #000; margin: 0 25px; padding-top: 5px;">
+                    <strong>Entrega / Origen</strong><br><small>Nombre y Firma</small>
+                </div>
+            </div>
+            <div class="col-6">
+                <div style="border-top: 1px solid #000; margin: 0 25px; padding-top: 5px;">
+                    <strong>Recibe / Destino / Vo. Bo.</strong><br><small>Nombre y Firma</small>
+                </div>
+            </div>
+        </div>
+    `;
+    new bootstrap.Modal(document.getElementById("printModal")).show();
 }
 
 // ==================== SINCRONIZACIÓN FIRESTORE EN TIEMPO REAL CON MIGRACIÓN ====================
@@ -1183,7 +1498,6 @@ function refreshActiveScreens() {
         }
     }
 }
-
 // ==================== INICIALIZACIÓN ====================
 window.addEventListener("DOMContentLoaded", () => {
     fillStationOptions(
@@ -1438,7 +1752,7 @@ function refreshOperatorUI() {
 function switchAdminTab(tab) {
     activeAdminTab = tab;
     persistSession();
-    const tabs = ["inventario", "stock", "operadores", "config", "fallas"];
+    const tabs = ["inventario", "stock", "traspasos", "operadores", "config", "fallas"];
     tabs.forEach(t => {
         const tabBtn = document.getElementById(`adm-tab-${t}`);
         const secDiv = document.getElementById(`admSection${t.charAt(0).toUpperCase() + t.slice(1)}`);
@@ -1483,6 +1797,7 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
 
     renderAdminInventoryGrouped();
     renderAdminStockTable();
+    renderTransfersPanel();
     renderOperatorsTable();
     renderCatalogs();
     renderAdminFaultsTable();
@@ -2636,8 +2951,18 @@ Object.assign(window, {
     saveStockFromModal,
     deleteStockItem,
     renderAdminStockTable,
-    loadInitialStock050351,
     exportStockExcel,
+    openMoveToStockModal,
+    onMtsStatusChange,
+    confirmMoveComponentToStock,
+    onTransferSourceChange,
+    onTransferComponentSelected,
+    onTransferActionChange,
+    onTransferTargetModuloChange,
+    updateTransferTargetHint,
+    onTrStockStatusChange,
+    submitDirectTransfer,
+    openPrintTransferFormat,
     onOpRegModuloChange,
     updateOpRoleHint,
     saveOperator,
@@ -2666,3 +2991,5 @@ Object.assign(window, {
     exportInventoryExcel,
     exportFaultsExcel
 });
+
+
