@@ -1133,17 +1133,33 @@ async function deleteComponent(id) {
 function renderAdminInventoryGrouped() {
     const fMod = document.getElementById("adminFilterModulo").value;
     const fTipo = document.getElementById("adminFilterTipo").value;
-    const search = document.getElementById("adminSearchInput").value.toLowerCase().trim();
+    const search = document.getElementById("adminSearchInput").value
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
 
     const filtered = appState.componentes.filter(c => {
         if (fMod !== "ALL" && c.modulo !== fMod) return false;
         if (fTipo !== "ALL" && c.tipo_componente !== fTipo) return false;
         if (search) {
             const op = getOperatorByStation(c.modulo, c.estacion);
-            const opName = op ? op.nombre_completo.toLowerCase() : "";
-            const estText = formatStationLabel(c.estacion).toLowerCase();
-            const haystack = `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.serie_lente || ""} ${c.serie_docking || ""} ${c.marca} ${c.modelo} ${c.tipo_componente} ${c.estado_fisico} ${opName} ${estText}`.toLowerCase();
-            if (!haystack.includes(search)) return false;
+            const opName = op ? op.nombre_completo : "";
+            const estNum = Number(c.estacion);
+            const estLabel = formatStationLabel(estNum);
+            const estAliases = estNum === 0
+                ? `0 estacion 0 est 0 e0 servidor`
+                : `${estNum} estacion ${estNum} est ${estNum} e${estNum}`;
+
+            const rawHaystack = `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.serie_lente || ""} ${c.serie_docking || ""} ${c.marca} ${c.modelo} ${c.tipo_componente} ${c.estado_fisico} ${c.observaciones || ""} ${opName} ${estLabel} ${estAliases}`;
+            const haystack = rawHaystack
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+
+            const terms = search.split(/\s+/).filter(Boolean);
+            const matchesAllTerms = terms.every(term => haystack.includes(term));
+            if (!matchesAllTerms) return false;
         }
         return true;
     });
