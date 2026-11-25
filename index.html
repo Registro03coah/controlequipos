@@ -3,602 +3,618 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MACs Inventario & Control de Fallas | Módulos 050351, 050353, 050354</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- Estilos personalizados -->
+    <title>Inventario de Componentes Tecnológicos - MAC Distrito 03</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="styles.css" rel="stylesheet">
-    <!-- Librería Escáner de Códigos de Barras / QR -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <!-- Librería SheetJS para exportar e importar Excel real (.xlsx / .csv) -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
-<body class="d-flex flex-column min-vh-100">
+<body>
 
-    <!-- ================= PANTALLA DE ACCESO ================= -->
-    <div id="loginScreen" class="login-wrapper flex-grow-1">
-        <div class="card login-card bg-white">
+    <!-- ==================== PANTALLA DE ACCESO (LOGIN) ==================== -->
+    <div id="loginScreen" class="login-wrapper">
+        <div class="card login-card">
             <div class="login-header">
-                <i class="bi bi-pc-display-horizontal fs-3 text-white"></i>
-                <h4 class="mt-2 mb-0 fw-bold">Registro de Equipo Tecnológico</h4>
-                <small class="text-white-50">050351 • 050353 • 050354</small>
-                <div class="mt-2">
-                    <span id="loginSyncBadge" class="badge bg-warning text-dark">
-                        <i class="bi bi-cloud-arrow-down me-1"></i>Conectando...
-                    </span>
+                <div class="d-flex justify-content-center align-items-center gap-2 mb-1">
+                    <i class="bi bi-pc-display-horizontal fs-4" style="color: #ff4da6;"></i>
+                    <span class="fw-bold">MÓDULOS MAC • DISTRITO 03</span>
                 </div>
+                <p class="mb-2 opacity-75">Control de Componentes Tecnológicos (050351 • 050353 • 050354)</p>
+                <span id="loginSyncBadge" class="badge bg-secondary">Conectando a la nube...</span>
             </div>
-            <div class="card-body p-4">
-                <ul class="nav nav-pills nav-fill mb-4 bg-light p-1 rounded-3" id="loginRoleTabs">
-                    <li class="nav-item">
+
+            <div class="card-body p-3">
+                <ul class="nav nav-pills nav-fill mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="tab-op-login" type="button" onclick="switchLoginTab('operator')">
-                            <i class="bi bi-person-badge me-1"></i> Personal MACs
+                            <i class="bi bi-person-badge me-1"></i>Operador / Responsable
                         </button>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link" id="tab-admin-login" type="button" onclick="switchLoginTab('admin')">
-                            <i class="bi bi-shield-lock me-1"></i> Administrador
+                            <i class="bi bi-shield-lock me-1"></i>Administrador
                         </button>
                     </li>
                 </ul>
 
-                <!-- Formulario Acceso Operador / Responsable de Módulo -->
+                <!-- Formulario Acceso Operador / Responsable -->
                 <form id="operatorLoginForm" onsubmit="loginAsOperator(event)">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Selecciona tu Módulo</label>
-                        <select class="form-select" id="loginModulo" required onchange="onLoginModuloChange()">
-                            <option value="050351">050351</option>
-                            <option value="050353">050353</option>
-                            <option value="050354">050354</option>
+                    <div class="mb-2">
+                        <label for="loginModulo" class="form-label fw-semibold mb-1">Módulo de Atención Ciudadana (MAC)</label>
+                        <select class="form-select form-select-sm" id="loginModulo" onchange="onLoginModuloChange()">
+                            <option value="050351">Módulo 050351</option>
+                            <option value="050353">Módulo 050353</option>
+                            <option value="050354">Módulo 050354</option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Usuario</label>
-                        <select class="form-select" id="loginEstacion" required onchange="previewOperatorProfile()"></select>
+
+                    <div class="mb-2">
+                        <label for="loginEstacion" class="form-label fw-semibold mb-1">Estación / Usuario Asignado</label>
+                        <select class="form-select form-select-sm" id="loginEstacion" onchange="previewOperatorProfile()"></select>
                     </div>
 
-                    <!-- Vista previa del operador / responsable registrado por el Admin -->
-                    <div id="operatorLoginPreview" class="alert alert-light border d-flex align-items-center gap-3 mb-4 py-2 px-3">
-                        <img id="previewOpPhoto" src="" alt="Operador" class="avatar-operator">
-                        <div class="min-w-0">
-                            <div class="small text-muted">Responsable / Operador Asignado:</div>
-                            <div id="previewOpName" class="fw-bold text-dark text-truncate">Sin responsable asignado</div>
-                            <div id="previewOpEmail" class="small text-secondary text-truncate">Solicita al Administrador tu registro</div>
+                    <!-- Tarjeta previa del operador/responsable -->
+                    <div class="p-2 rounded-3 bg-light border mb-3 d-flex align-items-center gap-2">
+                        <img id="previewOpPhoto" src="" alt="Foto perfil" class="avatar-operator">
+                        <div class="overflow-hidden">
+                            <div id="previewOpName" class="fw-bold text-dark text-truncate">Sin usuario asignado</div>
+                            <div id="previewOpEmail" class="text-muted text-truncate">Selecciona un módulo y estación</div>
                         </div>
                     </div>
 
-                    <button type="submit" id="btnEnterOperator" class="btn btn-pink w-100 shadow-sm py-2">
-                        <i class="bi bi-box-arrow-in-right me-2"></i>Ingresar a mi Estación
+                    <button type="submit" class="btn btn-pink w-100 fw-semibold">
+                        <i class="bi bi-box-arrow-in-right me-1"></i>Ingresar a mi Estación
                     </button>
                 </form>
 
                 <!-- Formulario Acceso Administrador -->
                 <form id="adminLoginForm" class="d-none" onsubmit="loginAsAdmin(event)">
-                    <div class="alert alert-secondary small">
-                        <i class="bi bi-info-circle me-1"></i> Acceso exclusivo para gestión de estaciones, operadores/responsables, marcas, inventario global, tickets de servicio, importación y exportación Excel.
+                    <div class="mb-3">
+                        <label for="adminPassword" class="form-label fw-semibold mb-1">Contraseña de Administrador</label>
+                        <input type="password" class="form-control form-control-sm" id="adminPassword" placeholder="Ingresa la clave de administrador" required>
+                        <div class="form-text text-muted">Acceso global a módulos, responsables, operadores, inventario y tickets.</div>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Contraseña de Administrador</label>
-                        <input type="password" class="form-control" id="adminPassword" placeholder="Ingresa clave" required>
-                    </div>
-                    <button type="submit" class="btn btn-dark w-100 shadow-sm py-2">
-                        <i class="bi bi-unlock-fill me-2"></i>Entrar como Administrador
+                    <button type="submit" class="btn btn-dark w-100 fw-semibold">
+                        <i class="bi bi-shield-check me-1"></i>Iniciar Sesión como Administrador
                     </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- ================= APLICACIÓN PRINCIPAL ================= -->
-    <div id="mainApp" class="d-none flex-grow-1">
+    <!-- ==================== APLICACIÓN PRINCIPAL ==================== -->
+    <div id="mainApp" class="d-none min-vh-100 d-flex flex-column">
         <!-- Barra Superior -->
-        <nav class="navbar navbar-expand-lg navbar-dark navbar-mac sticky-top shadow-sm">
-            <div class="container-fluid px-3 px-lg-4">
+        <nav class="navbar navbar-dark navbar-mac sticky-top shadow-sm py-2">
+            <div class="container-fluid">
                 <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                    <i class="bi bi-cpu-fill fs-5 text-white"></i>
-                    <div>
-                        <span class="fw-bold d-block lh-1">Registro de Equipo Tecnológico</span>
-                        <small class="text-white-50">050351 • 050353 • 050354</small>
-                    </div>
+                    <i class="bi bi-cpu-fill" style="color: #ff4da6;"></i>
+                    <span>Inventario MAC Distrito 03</span>
                 </a>
-                <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
-                    <span id="cloudStatusBadge" class="badge bg-success text-white py-2 px-2">
-                        <i class="bi bi-cloud-fill me-1"></i>En Línea
+
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span id="cloudStatusBadge" class="badge bg-secondary py-2 px-2">
+                        <i class="bi bi-cloud me-1"></i>Sincronizando
                     </span>
-                    <span id="sessionBadge" class="badge bg-light text-dark py-2 px-3"></span>
+                    <span id="sessionBadge" class="badge bg-light text-dark py-2 px-2"></span>
                     <button class="btn btn-outline-light btn-sm" onclick="logout()">
-                        <i class="bi bi-box-arrow-left me-1"></i>Salir
+                        <i class="bi bi-box-arrow-right me-1"></i>Salir
                     </button>
                 </div>
             </div>
         </nav>
 
-        <div class="container-fluid px-3 px-lg-4 py-4">
+        <div class="container-fluid py-3 flex-grow-1">
 
-            <!-- ================= VISTA DEL OPERADOR / RESPONSABLE DE MÓDULO ================= -->
+            <!-- ==================== VISTA DEL OPERADOR / RESPONSABLE ==================== -->
             <div id="operatorView" class="d-none">
-                <!-- Ficha de Identidad -->
-                <div class="card card-custom p-3 p-md-4 mb-4">
-                    <div class="row align-items-center g-3">
-                        <div class="col-auto">
-                            <img id="opCardPhoto" src="" alt="Foto Operador" class="avatar-operator" style="width: 58px; height: 58px;">
-                        </div>
-                        <div class="col">
-                            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                                <span class="badge bg-dark" id="opCardModulo">050351</span>
-                                <span class="badge btn-pink" id="opCardEstacion">Estación 1</span>
+                <!-- Tarjeta de Perfil del Operador / Responsable -->
+                <div class="card card-custom mb-3">
+                    <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <img id="opCardPhoto" src="" alt="Operador" class="avatar-operator" style="width: 58px; height: 58px;">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                    <span class="badge bg-dark" id="opCardModulo"></span>
+                                    <span class="badge btn-pink" id="opCardEstacion"></span>
+                                </div>
+                                <h5 id="opCardName" class="mb-1"></h5>
+                                <div class="text-muted">
+                                    <i class="bi bi-telephone me-1"></i><span id="opCardPhone"></span>
+                                    <span class="mx-2">•</span>
+                                    <i class="bi bi-envelope me-1"></i><span id="opCardEmail"></span>
+                                </div>
                             </div>
-                            <h4 class="fw-bold mb-1" id="opCardName">Nombre del Operador</h4>
-                            <div class="text-muted small d-flex flex-wrap gap-3">
-                                <span><i class="bi bi-telephone-fill text-danger me-1"></i><span id="opCardPhone">-</span></span>
-                                <span><i class="bi bi-envelope-fill text-danger me-1"></i><span id="opCardEmail">-</span></span>
-                            </div>
                         </div>
-                        <div class="col-md-auto text-md-end">
-                            <button type="button" class="btn btn-pink fw-semibold shadow-sm" onclick="openComponentModal('op')">
-                                <i class="bi bi-plus-circle-fill me-1"></i>Registrar Componente
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-pink fw-semibold" onclick="openComponentModal('op')">
+                                <i class="bi bi-plus-circle me-1"></i>Registrar Componente
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Pestañas del Operador -->
-                <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm">
+                <ul class="nav nav-pills mb-3">
                     <li class="nav-item">
                         <button class="nav-link active" id="op-tab-equipos" onclick="switchOpTab('equipos')">
-                            <i class="bi bi-pc-display me-1"></i> Mis Componentes
+                            <i class="bi bi-hdd-stack me-1"></i>Componentes de mi Estación
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="op-tab-fallas" onclick="switchOpTab('fallas')">
-                            <i class="bi bi-ticket-perforated-fill me-1"></i> Tickets y Reportes de Falla
-                            <span class="badge bg-danger ms-1" id="opFaultCountBadge">0</span>
+                            <i class="bi bi-ticket-perforated me-1"></i>Tickets de Servicio
+                            <span id="opFaultCountBadge" class="badge bg-danger ms-1">0</span>
                         </button>
                     </li>
                 </ul>
 
-                <!-- Tab 1 Operador: Listado Agrupado de Componentes -->
+                <!-- Sección Equipos del Operador -->
                 <div id="opSectionEquipos">
-                    <div class="card card-custom p-3 p-md-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                            <div>
-                                <h5 class="fw-bold mb-0"><i class="bi bi-hdd-rack me-2 text-danger"></i>Componentes de tu Estación por Grupo</h5>
-                                <small class="text-muted">Agrupados por tipo de componente. Puedes registrar, editar, eliminar o levantar ticket de falla.</small>
-                            </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-dark" id="opTotalComponents">0 equipos</span>
-                                <button type="button" class="btn btn-pink btn-sm fw-semibold" onclick="openComponentModal('op')">
-                                    <i class="bi bi-plus-lg me-1"></i>Nuevo
-                                </button>
-                            </div>
+                    <div class="card card-custom">
+                        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-pc-display text-danger me-2"></i>Equipos Asignados</h5>
+                            <span id="opTotalComponents" class="badge bg-dark">0 equipos</span>
                         </div>
-
-                        <div id="opGroupedComponentsContainer"></div>
+                        <div class="card-body">
+                            <div id="opGroupedComponentsContainer"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Tab 2 Operador: Historial de Fallas / Tickets de su Estación -->
+                <!-- Sección Fallas / Tickets del Operador -->
                 <div id="opSectionFallas" class="d-none">
-                    <div class="card card-custom p-3 p-md-4">
-                        <h5 class="fw-bold mb-3"><i class="bi bi-ticket-detailed-fill me-2 text-danger"></i>Tickets de Servicio y Reportes de Falla</h5>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Ticket / Folio</th>
-                                        <th>Fecha Reporte</th>
-                                        <th>Componente / Serie</th>
-                                        <th>Descripción Falla</th>
-                                        <th>Estatus / Solución</th>
-                                        <th class="text-end">Acciones / Hoja de Servicio</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="opFaultsTableBody"></tbody>
-                            </table>
+                    <div class="card card-custom">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0"><i class="bi bi-ticket-perforated-fill text-danger me-2"></i>Mis Tickets de Servicio y Reportes de Falla</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Folio Ticket</th>
+                                            <th>Fecha Reporte</th>
+                                            <th>Componente / Serie</th>
+                                            <th>Falla Reportada</th>
+                                            <th>Estatus</th>
+                                            <th class="text-end">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="opFaultsTableBody"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ================= VISTA DEL ADMINISTRADOR ================= -->
+            <!-- ==================== VISTA DEL ADMINISTRADOR ==================== -->
             <div id="adminView" class="d-none">
-                <!-- Alerta en tiempo real cuando existen tickets de falla pendientes -->
-                <div id="adminTicketAlertBar" class="alert alert-danger d-none align-items-center justify-content-between mb-3 shadow-sm">
+                <!-- Alerta de tickets pendientes -->
+                <div id="adminTicketAlertBar" class="alert alert-warning border-warning d-none justify-content-between align-items-center mb-3" role="alert">
                     <div>
-                        <i class="bi bi-bell-fill me-2"></i>
-                        <strong>¡Atención Administrador!</strong> Tienes <span id="adminTicketAlertCount" class="fw-bold">0</span> ticket(s) de servicio pendiente(s) por atender.
+                        <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                        Hay <strong id="adminTicketAlertCount">0</strong> ticket(s) de servicio abiertos o pendientes de atención.
                     </div>
-                    <button type="button" class="btn btn-sm btn-danger" onclick="switchAdminTab('fallas')">
-                        <i class="bi bi-ticket-perforated me-1"></i>Ver Tickets y Dar Seguimiento
+                    <button class="btn btn-sm btn-dark" onclick="switchAdminTab('fallas')">
+                        Ver Tickets <i class="bi bi-arrow-right ms-1"></i>
                     </button>
                 </div>
 
-                <div class="row g-3 mb-4">
-                    <div class="col-6 col-xl-3">
-                        <div class="card card-custom stat-card p-3">
-                            <small class="text-muted fw-bold">TOTAL COMPONENTES</small>
-                            <h3 class="fw-bold mb-0 mt-1" id="adminStatTotal">0</h3>
+                <!-- Tarjetas Resumen -->
+                <div class="row g-3 mb-3">
+                    <div class="col-6 col-md-3">
+                        <div class="card card-custom stat-card h-100">
+                            <div class="card-body">
+                                <div class="text-muted">Total Componentes</div>
+                                <h4 id="adminStatTotal" class="mt-1 mb-0">0</h4>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-6 col-xl-3">
-                        <div class="card card-custom stat-card p-3" style="border-left-color: #0d6efd;">
-                            <small class="text-muted fw-bold">OPERADORES / RESP.</small>
-                            <h3 class="fw-bold mb-0 mt-1 text-primary" id="adminStatOperators">0</h3>
+                    <div class="col-6 col-md-3">
+                        <div class="card card-custom stat-card h-100">
+                            <div class="card-body">
+                                <div class="text-muted">Operadores / Resp.</div>
+                                <h4 id="adminStatOperators" class="mt-1 mb-0">0</h4>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-6 col-xl-3">
-                        <div class="card card-custom stat-card p-3" style="border-left-color: #198754;">
-                            <small class="text-muted fw-bold">ESTACIONES ACTIVAS</small>
-                            <h3 class="fw-bold mb-0 mt-1 text-success" id="adminStatStations">0</h3>
+                    <div class="col-6 col-md-3">
+                        <div class="card card-custom stat-card h-100">
+                            <div class="card-body">
+                                <div class="text-muted">Estaciones (Incl. Serv.)</div>
+                                <h4 id="adminStatStations" class="mt-1 mb-0">0</h4>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-6 col-xl-3">
-                        <div class="card card-custom stat-card p-3" style="border-left-color: #dc3545;">
-                            <small class="text-muted fw-bold">TICKETS / FALLAS ACTIVAS</small>
-                            <h3 class="fw-bold mb-0 mt-1 text-danger" id="adminStatFaults">0</h3>
+                    <div class="col-6 col-md-3">
+                        <div class="card card-custom stat-card h-100">
+                            <div class="card-body">
+                                <div class="text-muted">Tickets Abiertos</div>
+                                <h4 id="adminStatFaults" class="text-danger mt-1 mb-0">0</h4>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-4 shadow-sm flex-wrap">
+                <!-- Pestañas del Administrador -->
+                <ul class="nav nav-pills mb-3 flex-wrap gap-1">
                     <li class="nav-item">
                         <button class="nav-link active" id="adm-tab-inventario" onclick="switchAdminTab('inventario')">
-                            <i class="bi bi-pc-display me-1"></i> 1. Inventario por Grupos
+                            <i class="bi bi-boxes me-1"></i>Inventario Global
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="adm-tab-operadores" onclick="switchAdminTab('operadores')">
-                            <i class="bi bi-people-fill me-1"></i> 2. Registro de Operadores de MAC Distrito 03
+                            <i class="bi bi-people me-1"></i>Operadores y Responsables
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="adm-tab-config" onclick="switchAdminTab('config')">
-                            <i class="bi bi-sliders me-1"></i> 3. Estaciones, Marcas y Catálogos
+                            <i class="bi bi-sliders me-1"></i>Estaciones y Catálogos
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="adm-tab-fallas" onclick="switchAdminTab('fallas')">
-                            <i class="bi bi-ticket-perforated-fill me-1"></i> 4. Tickets y Reportes de Falla
-                            <span class="badge bg-danger ms-1" id="admFaultBadge">0</span>
+                            <i class="bi bi-ticket-perforated me-1"></i>Tickets de Servicio
+                            <span id="admFaultBadge" class="badge bg-danger ms-1">0</span>
                         </button>
                     </li>
                 </ul>
 
-                <!-- SECCIÓN ADMIN 1: INVENTARIO AGRUPADO DE COMPONENTES -->
+                <!-- SECCIÓN 1: INVENTARIO GLOBAL -->
                 <div id="admSectionInventario">
-                    <div class="card card-custom p-3 p-md-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                            <h5 class="fw-bold mb-0"><i class="bi bi-collection text-danger me-2"></i>Inventario General Agrupado por Componente</h5>
-                            <div class="d-flex flex-wrap gap-2">
-                                <button type="button" class="btn btn-pink btn-sm fw-semibold shadow-sm" onclick="openComponentModal('admin')">
-                                    <i class="bi bi-plus-circle-fill me-1"></i>Registrar Componente
-                                </button>
-                                <button type="button" class="btn btn-outline-dark btn-sm fw-semibold" onclick="downloadImportTemplate()">
-                                    <i class="bi bi-download me-1"></i>Plantilla
-                                </button>
-                                <label class="btn btn-primary btn-sm fw-semibold mb-0 shadow-sm" style="cursor:pointer;">
-                                    <i class="bi bi-upload me-1"></i>Importar Excel / CSV
-                                    <input type="file" id="importExcelInput" accept=".xlsx,.xls,.csv" class="d-none" onchange="importInventoryExcel(event)">
-                                </label>
-                                <button type="button" class="btn btn-success btn-sm fw-semibold shadow-sm" onclick="exportInventoryExcel()">
-                                    <i class="bi bi-file-earmark-excel-fill me-1"></i>Exportar a Excel
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="row g-2 mb-4">
-                            <div class="col-md-4">
-                                <select class="form-select" id="adminFilterModulo" onchange="renderAdminInventoryGrouped()">
-                                    <option value="ALL">Todos los Módulos</option>
-                                    <option value="050351">050351</option>
-                                    <option value="050353">050353</option>
-                                    <option value="050354">050354</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <select class="form-select" id="adminFilterTipo" onchange="renderAdminInventoryGrouped()">
-                                    <option value="ALL">Todos los Componentes</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <input type="text" class="form-control" id="adminSearchInput" placeholder="Buscar serie, Inv. INE, operador..." onkeyup="renderAdminInventoryGrouped()">
-                            </div>
-                        </div>
-
-                        <div id="adminGroupedComponentsContainer"></div>
-                    </div>
-                </div>
-
-                <!-- SECCIÓN ADMIN 2: REGISTRO DE OPERADORES DE MAC DISTRITO 03 -->
-                <div id="admSectionOperadores" class="d-none">
-                    <div class="row g-4">
-                        <div class="col-lg-4">
-                            <div class="card card-custom p-3 p-md-4">
-                                <h5 class="fw-bold mb-3" id="opFormTitle">
-                                    <i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable
-                                </h5>
-                                <form id="operatorForm" onsubmit="saveOperator(event)">
-                                    <input type="hidden" id="editOpId" value="">
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Módulo *</label>
-                                            <select class="form-select" id="opRegModulo" required onchange="onOpRegModuloChange()">
-                                                <option value="050351">050351</option>
-                                                <option value="050353">050353</option>
-                                                <option value="050354">050354</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="form-label fw-semibold small">Estación (0 = Servidor) *</label>
-                                            <select class="form-select" id="opRegEstacion" required onchange="updateOpRoleHint()"></select>
-                                        </div>
-                                    </div>
-
-                                    <div class="alert alert-info py-2 px-3 mb-3 small">
-                                        <i class="bi bi-info-circle-fill me-1"></i>
-                                        Rol de estación: <strong id="opRoleHint">Operador de Estación</strong>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Nombre Completo *</label>
-                                        <input type="text" class="form-control" id="opRegNombre" placeholder="Ej. Juan Carlos Pérez López" required>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Teléfono de Contacto *</label>
-                                        <input type="tel" class="form-control" id="opRegTelefono" placeholder="Ej. 866 123 4567" required>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Correo Institucional *</label>
-                                        <input type="email" class="form-control" id="opRegCorreo" placeholder="nombre.apellido@ine.mx" required>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold small">Fotografía</label>
-                                        <input type="file" class="form-control" id="opFotoInput" accept="image/*" capture="user" onchange="previewImageFile(event, 'opPhotoPreview', 'opPhotoImg', 'currentOpPhoto')">
-                                        <div id="opPhotoPreview" class="mt-2 d-none text-center">
-                                            <img id="opPhotoImg" src="" alt="Foto Operador" class="avatar-operator">
-                                            <button type="button" class="btn btn-sm btn-link text-danger d-block mx-auto" onclick="clearImageField('opFotoInput', 'opPhotoPreview', 'currentOpPhoto')">Quitar foto</button>
-                                        </div>
-                                    </div>
-
-                                    <div class="d-grid gap-2">
-                                        <button type="submit" class="btn btn-pink">
-                                            <i class="bi bi-person-check-fill me-1"></i>Guardar Registro
-                                        </button>
-                                        <button type="button" id="btnCancelEditOp" class="btn btn-outline-secondary d-none" onclick="resetOperatorForm()">
-                                            Cancelar Edición
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div class="col-lg-8">
-                            <div class="card card-custom p-3 p-md-4">
-                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                                    <h5 class="fw-bold mb-0"><i class="bi bi-person-lines-fill text-danger me-2"></i>Registro de Operadores de MAC Distrito 03</h5>
-                                    <select class="form-select w-auto" id="filterOpModulo" onchange="renderOperatorsTable()">
+                    <div class="card card-custom mb-3">
+                        <div class="card-body">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-md-2">
+                                    <label for="adminFilterModulo" class="form-label fw-semibold mb-1">Módulo</label>
+                                    <select class="form-select form-select-sm" id="adminFilterModulo" onchange="renderAdminInventoryGrouped()">
                                         <option value="ALL">Todos los Módulos</option>
                                         <option value="050351">050351</option>
                                         <option value="050353">050353</option>
                                         <option value="050354">050354</option>
                                     </select>
                                 </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Foto</th>
-                                                <th>Módulo / Estación</th>
-                                                <th>Nombre Completo</th>
-                                                <th>Teléfono</th>
-                                                <th>Correo Institucional</th>
-                                                <th class="text-end">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="operatorsTableBody"></tbody>
-                                    </table>
+
+                                <div class="col-12 col-md-3">
+                                    <label for="adminFilterTipo" class="form-label fw-semibold mb-1">Tipo de Componente</label>
+                                    <select class="form-select form-select-sm" id="adminFilterTipo" onchange="renderAdminInventoryGrouped()"></select>
+                                </div>
+
+                                <div class="col-12 col-md-3">
+                                    <label for="adminSearchInput" class="form-label fw-semibold mb-1">Buscar (Serie, Inv. INE, CPU, Operador)</label>
+                                    <input type="text" class="form-control form-control-sm" id="adminSearchInput" placeholder="Escribe para buscar..." oninput="renderAdminInventoryGrouped()">
+                                </div>
+
+                                <div class="col-12 col-md-4 d-flex gap-1 flex-wrap justify-content-md-end">
+                                    <button class="btn btn-sm btn-pink fw-semibold" onclick="openComponentModal('admin')">
+                                        <i class="bi bi-plus-circle me-1"></i>Nuevo Equipo
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-dark" onclick="downloadImportTemplate()" title="Descargar plantilla Excel">
+                                        <i class="bi bi-file-earmark-arrow-down me-1"></i>Plantilla
+                                    </button>
+                                    <label class="btn btn-sm btn-outline-primary mb-0" title="Importar desde Excel o CSV">
+                                        <i class="bi bi-file-earmark-arrow-up me-1"></i>Importar
+                                        <input type="file" accept=".xlsx,.xls,.csv" class="d-none" onchange="importInventoryExcel(event)">
+                                    </label>
+                                    <button class="btn btn-sm btn-success" onclick="exportInventoryExcel()" title="Exportar inventario a Excel">
+                                        <i class="bi bi-file-earmark-excel me-1"></i>Exportar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="adminGroupedComponentsContainer"></div>
+                </div>
+
+                <!-- SECCIÓN 2: OPERADORES Y RESPONSABLES -->
+                <div id="admSectionOperadores" class="d-none">
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-4">
+                            <div class="card card-custom">
+                                <div class="card-header bg-white border-bottom">
+                                    <h5 id="opFormTitle" class="mb-0"><i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="operatorForm" onsubmit="saveOperator(event)">
+                                        <input type="hidden" id="editOpId">
+
+                                        <div class="mb-2">
+                                            <label for="opRegModulo" class="form-label fw-semibold mb-1">Módulo</label>
+                                            <select class="form-select form-select-sm" id="opRegModulo" onchange="onOpRegModuloChange()">
+                                                <option value="050351">050351</option>
+                                                <option value="050353">050353</option>
+                                                <option value="050354">050354</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label for="opRegEstacion" class="form-label fw-semibold mb-1">Estación</label>
+                                            <select class="form-select form-select-sm" id="opRegEstacion" onchange="updateOpRoleHint()"></select>
+                                            <div id="opRoleHint" class="mt-1 fw-semibold"></div>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label for="opRegNombre" class="form-label fw-semibold mb-1">Nombre Completo</label>
+                                            <input type="text" class="form-control form-control-sm" id="opRegNombre" required placeholder="Nombre y apellidos">
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label for="opRegTelefono" class="form-label fw-semibold mb-1">Teléfono</label>
+                                            <input type="text" class="form-control form-control-sm" id="opRegTelefono" required placeholder="Ej. 8661234567">
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label for="opRegCorreo" class="form-label fw-semibold mb-1">Correo Institucional</label>
+                                            <input type="email" class="form-control form-control-sm" id="opRegCorreo" required placeholder="usuario@ine.mx">
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="opFotoInput" class="form-label fw-semibold mb-1">Fotografía</label>
+                                            <input type="file" class="form-control form-control-sm" id="opFotoInput" accept="image/*" onchange="previewImageFile(event, 'opPhotoPreview', 'opPhotoImg', 'currentOpPhoto')">
+                                            <div id="opPhotoPreview" class="d-none mt-2 d-flex align-items-center gap-2">
+                                                <img id="opPhotoImg" src="" alt="Vista previa" class="avatar-operator">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearImageField('opFotoInput', 'opPhotoPreview', 'currentOpPhoto')">Quitar foto</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex gap-2">
+                                            <button type="submit" class="btn btn-pink btn-sm fw-semibold flex-grow-1">
+                                                <i class="bi bi-check-lg me-1"></i>Guardar
+                                            </button>
+                                            <button type="button" id="btnCancelEditOp" class="btn btn-outline-secondary btn-sm d-none" onclick="resetOperatorForm()">
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-8">
+                            <div class="card card-custom">
+                                <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <h5 class="mb-0"><i class="bi bi-person-lines-fill text-danger me-2"></i>Personal Registrado</h5>
+                                    <select class="form-select form-select-sm w-auto" id="filterOpModulo" onchange="renderOperatorsTable()">
+                                        <option value="ALL">Todos los Módulos</option>
+                                        <option value="050351">050351</option>
+                                        <option value="050353">050353</option>
+                                        <option value="050354">050354</option>
+                                    </select>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Foto</th>
+                                                    <th>Módulo / Est.</th>
+                                                    <th>Nombre</th>
+                                                    <th>Teléfono</th>
+                                                    <th>Correo</th>
+                                                    <th class="text-end">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="operatorsTableBody"></tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- SECCIÓN ADMIN 3: CONFIGURACIÓN DE ESTACIONES, MARCAS Y TIPOS -->
+                <!-- SECCIÓN 3: ESTACIONES Y CATÁLOGOS -->
                 <div id="admSectionConfig" class="d-none">
-                    <div class="row g-4">
-                        <div class="col-lg-4">
-                            <div class="card card-custom p-4 h-100">
-                                <h5 class="fw-bold mb-3"><i class="bi bi-building-gear text-danger me-2"></i>Estaciones Operativas por Módulo</h5>
-                                <p class="text-muted small">La <strong>Estación 0 (Servidor)</strong> se incluye automáticamente en los 3 módulos. Aquí defines cuántas estaciones operativas adicionales (1, 2, 3...) tiene cada módulo.</p>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">050351 (Estaciones 1 a N)</label>
-                                    <input type="number" class="form-control" id="cfg-050351" min="0" max="30">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <div class="card card-custom h-100">
+                                <div class="card-header bg-white border-bottom">
+                                    <h5 class="mb-0"><i class="bi bi-diagram-3-fill text-danger me-2"></i>Estaciones por Módulo (Además de Est. 0)</h5>
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">050353 (Estaciones 1 a N)</label>
-                                    <input type="number" class="form-control" id="cfg-050353" min="0" max="30">
+                                <div class="card-body">
+                                    <div class="mb-2">
+                                        <label for="cfg-050351" class="form-label fw-semibold mb-1">Módulo 050351</label>
+                                        <input type="number" min="0" class="form-control form-control-sm" id="cfg-050351">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label for="cfg-050353" class="form-label fw-semibold mb-1">Módulo 050353</label>
+                                        <input type="number" min="0" class="form-control form-control-sm" id="cfg-050353">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="cfg-050354" class="form-label fw-semibold mb-1">Módulo 050354</label>
+                                        <input type="number" min="0" class="form-control form-control-sm" id="cfg-050354">
+                                    </div>
+                                    <button class="btn btn-dark btn-sm w-100 fw-semibold" onclick="saveStationCounts()">
+                                        <i class="bi bi-save me-1"></i>Guardar Cantidad de Estaciones
+                                    </button>
                                 </div>
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">050354 (Estaciones 1 a N)</label>
-                                    <input type="number" class="form-control" id="cfg-050354" min="0" max="30">
-                                </div>
-                                <button class="btn btn-pink w-100 mt-auto" onclick="saveStationCounts()">
-                                    <i class="bi bi-check-circle me-1"></i>Actualizar Estaciones
-                                </button>
                             </div>
                         </div>
 
-                        <div class="col-lg-4">
-                            <div class="card card-custom p-4 h-100">
-                                <h5 class="fw-bold mb-3"><i class="bi bi-tags-fill text-danger me-2"></i>Catálogo de Marcas</h5>
-                                <p class="text-muted small">Marcas disponibles al registrar los equipos.</p>
-                                <div class="input-group mb-3">
-                                    <input type="text" class="form-control" id="newBrandInput" placeholder="Nueva marca (ej. Brother)">
-                                    <button class="btn btn-dark" type="button" onclick="addCatalogItem('brands', 'newBrandInput')">Agregar</button>
+                        <div class="col-12 col-md-4">
+                            <div class="card card-custom h-100">
+                                <div class="card-header bg-white border-bottom">
+                                    <h5 class="mb-0"><i class="bi bi-tags-fill text-danger me-2"></i>Catálogo de Marcas</h5>
                                 </div>
-                                <div id="brandsListContainer" class="d-flex flex-wrap gap-2"></div>
+                                <div class="card-body">
+                                    <div class="input-group input-group-sm mb-3">
+                                        <input type="text" class="form-control" id="newBrandInput" placeholder="Nueva marca...">
+                                        <button class="btn btn-pink" type="button" onclick="addCatalogItem('marcas', 'newBrandInput')">
+                                            <i class="bi bi-plus-lg"></i>
+                                        </button>
+                                    </div>
+                                    <div id="brandsListContainer" class="d-flex flex-wrap gap-1"></div>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="col-lg-4">
-                            <div class="card card-custom p-4 h-100">
-                                <h5 class="fw-bold mb-3"><i class="bi bi-pc text-danger me-2"></i>Tipos de Componentes</h5>
-                                <p class="text-muted small">Equipos digitales que conforman cada estación y servidor.</p>
-                                <div class="input-group mb-3">
-                                    <input type="text" class="form-control" id="newTypeInput" placeholder="Nuevo tipo (ej. Decadactilar)">
-                                    <button class="btn btn-dark" type="button" onclick="addCatalogItem('types', 'newTypeInput')">Agregar</button>
+                        <div class="col-12 col-md-4">
+                            <div class="card card-custom h-100">
+                                <div class="card-header bg-white border-bottom">
+                                    <h5 class="mb-0"><i class="bi bi-pc-display text-danger me-2"></i>Catálogo de Componentes</h5>
                                 </div>
-                                <div id="typesListContainer" class="d-flex flex-wrap gap-2"></div>
+                                <div class="card-body">
+                                    <div class="input-group input-group-sm mb-3">
+                                        <input type="text" class="form-control" id="newTypeInput" placeholder="Nuevo componente...">
+                                        <button class="btn btn-pink" type="button" onclick="addCatalogItem('tipos_componente', 'newTypeInput')">
+                                            <i class="bi bi-plus-lg"></i>
+                                        </button>
+                                    </div>
+                                    <div id="typesListContainer" class="d-flex flex-wrap gap-1"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- SECCIÓN ADMIN 4: BITÁCORA DE TICKETS Y REPORTES DE FALLA -->
+                <!-- SECCIÓN 4: TICKETS DE SERVICIO Y REPORTES DE FALLA -->
                 <div id="admSectionFallas" class="d-none">
-                    <div class="card card-custom p-3 p-md-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                            <div>
-                                <h5 class="fw-bold mb-0"><i class="bi bi-ticket-perforated-fill text-danger me-2"></i>Tickets de Servicio y Bitácora de Fallas</h5>
-                                <small class="text-muted">Seguimiento de tickets recibidos, hoja de servicio para firmas y cierre técnico.</small>
-                            </div>
-                            <button class="btn btn-success fw-semibold" onclick="exportFaultsExcel()">
-                                <i class="bi bi-file-earmark-excel-fill me-1"></i>Exportar Tickets a Excel
+                    <div class="card card-custom">
+                        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h5 class="mb-0"><i class="bi bi-ticket-perforated-fill text-danger me-2"></i>Control Global de Tickets y Fallas</h5>
+                            <button class="btn btn-sm btn-success" onclick="exportFaultsExcel()">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Exportar Tickets a Excel
                             </button>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Ticket / Folio</th>
-                                        <th>Módulo / Estación</th>
-                                        <th>Usuario / Resp.</th>
-                                        <th>Componente / Serie</th>
-                                        <th>Falla Reportada</th>
-                                        <th>Seguimiento / Estatus</th>
-                                        <th class="text-end">Acciones / Hoja Servicio</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="adminFaultsTableBody"></tbody>
-                            </table>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Folio / Fecha</th>
+                                            <th>Módulo / Est.</th>
+                                            <th>Usuario</th>
+                                            <th>Componente / Serie</th>
+                                            <th>Falla</th>
+                                            <th>Estatus</th>
+                                            <th class="text-end">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminFaultsTableBody"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
         </div>
+
+        <!-- Pie de página institucional -->
+        <footer class="app-footer">
+            Registro de Equipo Tecnológico • Módulos de Atención Ciudadana (050351 • 050353 • 050354) • CarRivers Design
+        </footer>
     </div>
 
-    <!-- ================= PIE DE PÁGINA ================= -->
-    <footer class="app-footer mt-auto no-print">
-        Derechos Reservados &copy; 2026 • Creador: <strong>CarRivers Design</strong>
-    </footer>
-
-    <!-- ================= MODAL FLOTANTE: REGISTRAR / EDITAR COMPONENTE ================= -->
-    <div class="modal fade" id="componentModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <!-- ==================== MODAL REGISTRAR / EDITAR COMPONENTE ==================== -->
+    <div class="modal fade" id="componentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title" id="compModalTitle">
-                        <i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header">
+                    <h5 id="compModalTitle" class="modal-title"><i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="componentForm" onsubmit="saveComponentFromModal(event)">
                     <div class="modal-body">
-                        <input type="hidden" id="editCompId" value="">
+                        <input type="hidden" id="editCompId">
                         <input type="hidden" id="compFormContext" value="admin">
 
-                        <div class="row g-3 mb-3" id="compAdminLocationRow">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Módulo *</label>
-                                <select class="form-select" id="compModulo" onchange="onAdminCompModuloChange()">
+                        <div id="compAdminLocationRow" class="row g-2 mb-2">
+                            <div class="col-12 col-sm-6">
+                                <label for="compModulo" class="form-label fw-semibold mb-1">Módulo</label>
+                                <select class="form-select form-select-sm" id="compModulo" onchange="onAdminCompModuloChange()">
                                     <option value="050351">050351</option>
                                     <option value="050353">050353</option>
                                     <option value="050354">050354</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Estación (0 = Servidor) *</label>
-                                <select class="form-select" id="compEstacion" onchange="onAdminStationOrBrandChange()"></select>
-                            </div>
-                            <div class="col-12">
-                                <div class="alert alert-light border py-2 px-3 mb-0 small">
-                                    <i class="bi bi-person-check-fill text-primary me-1"></i>
-                                    Asignado: <strong id="compOperatorHint">Sin asignar</strong>
-                                </div>
+                            <div class="col-12 col-sm-6">
+                                <label for="compEstacion" class="form-label fw-semibold mb-1">Estación</label>
+                                <select class="form-select form-select-sm" id="compEstacion" onchange="onAdminStationOrBrandChange()"></select>
+                                <div id="compOperatorHint" class="mt-1 fw-semibold"></div>
                             </div>
                         </div>
 
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Tipo de Componente *</label>
-                                <select class="form-select" id="compTipo" required onchange="onModalBrandOrTypeChange()"></select>
+                        <div class="row g-2">
+                            <div class="col-12 col-sm-6">
+                                <label for="compTipo" class="form-label fw-semibold mb-1">Tipo de Componente</label>
+                                <select class="form-select form-select-sm" id="compTipo" onchange="onModalBrandOrTypeChange()"></select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Estado Físico</label>
-                                <select class="form-select" id="compEstado">
+
+                            <div class="col-12 col-sm-6">
+                                <label for="compMarca" class="form-label fw-semibold mb-1">Marca</label>
+                                <select class="form-select form-select-sm" id="compMarca" onchange="onModalBrandOrTypeChange()"></select>
+                            </div>
+
+                            <div class="col-12 col-sm-6">
+                                <label for="compModelo" class="form-label fw-semibold mb-1">Modelo</label>
+                                <input type="text" class="form-control form-control-sm" id="compModelo" placeholder="Ej. OptiPlex 7010 / STU-540">
+                            </div>
+
+                            <div class="col-12 col-sm-6">
+                                <label for="compSerie" class="form-label fw-semibold mb-1">Número de Serie</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control text-uppercase" id="compSerie" required placeholder="Escanea o escribe la serie">
+                                    <button type="button" id="btnCompScanSerie" class="btn btn-outline-dark" onclick="openScanner('compSerie')" title="Escanear código">
+                                        <i class="bi bi-upc-scan"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-sm-6">
+                                <label for="compInventarioIne" class="form-label fw-semibold mb-1">Inventario INE (Opcional)</label>
+                                <input type="text" class="form-control form-control-sm text-uppercase" id="compInventarioIne" placeholder="Folio o etiqueta INE">
+                            </div>
+
+                            <div class="col-12 col-sm-6">
+                                <label for="compEstado" class="form-label fw-semibold mb-1">Estado Físico</label>
+                                <select class="form-select form-select-sm" id="compEstado">
                                     <option value="Operativo">Operativo</option>
                                     <option value="Stock">Stock</option>
                                     <option value="En Falla">En Falla</option>
-                                    <option value="En Revisión">En Revisión</option>
+                                    <option value="En Revision">En Revision</option>
                                     <option value="No Aplica">No Aplica</option>
                                     <option value="Baja">Baja</option>
                                 </select>
                             </div>
-                        </div>
 
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Marca *</label>
-                                <select class="form-select" id="compMarca" required onchange="onModalBrandOrTypeChange()"></select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Modelo *</label>
-                                <input type="text" class="form-control" id="compModelo" placeholder="Ej. OptiPlex 7090" required>
-                            </div>
-                        </div>
-
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Número de Serie / Código de Barras *</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control fw-bold" id="compSerie" placeholder="Escanea o escribe..." required>
-                                    <button class="btn btn-dark" type="button" id="btnCompScanSerie" onclick="openScanner('compSerie')">
-                                        <i class="bi bi-upc-scan me-1"></i>Escanear
-                                    </button>
+                            <!-- Vinculación Monitor <-> CPU -->
+                            <div class="col-12 d-none" id="compCpuLinkContainer">
+                                <div class="p-2 rounded border bg-light">
+                                    <label for="compCpuSelect" class="form-label fw-semibold mb-1">
+                                        <i class="bi bi-link-45deg text-danger me-1"></i>Vincular con CPU / Computadora (Misma Estación)
+                                    </label>
+                                    <select class="form-select form-select-sm mb-2" id="compCpuSelect" onchange="onCompCpuSelectChange()">
+                                        <option value="">-- Seleccionar CPU registrado --</option>
+                                    </select>
+                                    <label for="compSerieCpuVinculada" class="form-label mb-1">Serie del CPU vinculada</label>
+                                    <input type="text" class="form-control form-control-sm text-uppercase" id="compSerieCpuVinculada" placeholder="Ej. ABC1234XYZ o seleccionarlo arriba">
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Inventario INE</label>
-                                <input type="text" class="form-control" id="compInventarioIne" placeholder="Ej. INE-03-00452 (opcional)">
-                            </div>
-                        </div>
 
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Fotografía del Componente</label>
-                                <input type="file" class="form-control" id="compFotoInput" accept="image/*" capture="environment" onchange="previewImageFile(event, 'compPhotoPreview', 'compPhotoImg', 'currentCompPhoto')">
-                                <div id="compPhotoPreview" class="mt-2 d-none text-center">
-                                    <img id="compPhotoImg" src="" alt="Vista previa" class="img-thumbnail" style="max-height: 110px;">
-                                    <button type="button" class="btn btn-sm btn-link text-danger d-block mx-auto" onclick="clearImageField('compFotoInput', 'compPhotoPreview', 'currentCompPhoto')">Quitar foto</button>
-                                </div>
+                            <div class="col-12">
+                                <label for="compNotas" class="form-label fw-semibold mb-1">Observaciones</label>
+                                <input type="text" class="form-control form-control-sm" id="compNotas" placeholder="Notas adicionales o ubicación específica">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small">Observaciones</label>
-                                <input type="text" class="form-control" id="compNotas" placeholder="Opcional: cables, accesorios, detalles...">
+
+                            <div class="col-12">
+                                <label for="compFotoInput" class="form-label fw-semibold mb-1">Fotografía del Equipo (Opcional)</label>
+                                <input type="file" class="form-control form-control-sm" id="compFotoInput" accept="image/*" onchange="previewImageFile(event, 'compPhotoPreview', 'compPhotoImg', 'currentCompPhoto')">
+                                <div id="compPhotoPreview" class="d-none mt-2 d-flex align-items-center gap-2">
+                                    <img id="compPhotoImg" src="" alt="Vista previa" class="img-thumb">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearImageField('compFotoInput', 'compPhotoPreview', 'currentCompPhoto')">Quitar foto</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-pink fw-semibold">
-                            <i class="bi bi-save me-1"></i>Guardar Componente
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-pink btn-sm fw-semibold">
+                            <i class="bi bi-check-circle me-1"></i>Guardar Componente
                         </button>
                     </div>
                 </form>
@@ -606,54 +622,53 @@
         </div>
     </div>
 
-    <!-- ================= MODAL GENERAR TICKET DE SERVICIO / FALLA ================= -->
-    <div class="modal fade" id="reportFaultModal" tabindex="-1">
+    <!-- ==================== MODAL REPORTAR FALLA / TICKET ==================== -->
+    <div class="modal fade" id="reportFaultModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title"><i class="bi bi-ticket-perforated-fill me-2"></i>Generar Ticket de Servicio por Falla</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-ticket-perforated-fill text-danger me-2"></i>Levantar Ticket de Servicio / Falla</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="faultForm" onsubmit="submitFaultReport(event)">
                     <div class="modal-body">
                         <input type="hidden" id="faultCompId">
-                        <div class="alert alert-light border small mb-3">
-                            <div><strong>Equipo:</strong> <span id="faultCompInfo"></span></div>
-                            <div><strong>N° Serie:</strong> <span id="faultCompSerie" class="font-monospace"></span></div>
-                            <div><strong>Ubicación:</strong> <span id="faultLocationInfo"></span></div>
+                        <div class="p-2 rounded bg-light border mb-3">
+                            <div class="fw-bold" id="faultCompInfo"></div>
+                            <div>Serie: <span id="faultCompSerie" class="font-monospace fw-bold text-danger"></span></div>
+                            <div class="text-muted" id="faultLocationInfo"></div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Tipo de Falla *</label>
-                            <select class="form-select" id="faultCategory" required>
-                                <option value="No enciende / Sin energía">No enciende / Sin energía</option>
-                                <option value="Error de lectura / Calibración">Error de lectura / Calibración (Escáner, Huellas, Firma)</option>
-                                <option value="Falla de conectividad / Cableado">Falla de conectividad / Cableado / USB</option>
-                                <option value="Atasco / Error de impresión">Atasco / Error de impresión</option>
-                                <option value="Pantalla / Imagen defectuosa">Pantalla / Imagen defectuosa / Cámara</option>
-                                <option value="Sistema lento / Error de software">Sistema lento / Error de software</option>
-                                <option value="Daño físico en componente">Daño físico en componente</option>
+                        <div class="mb-2">
+                            <label for="faultCategory" class="form-label fw-semibold mb-1">Clasificación de Falla</label>
+                            <select class="form-select form-select-sm" id="faultCategory">
+                                <option value="Hardware">Hardware</option>
+                                <option value="Software / Sistema">Software / Sistema</option>
+                                <option value="Conectividad / Red">Conectividad / Red</option>
+                                <option value="Energía / UPS">Energía / UPS</option>
+                                <option value="Biometría / Captura">Biometría / Captura</option>
                                 <option value="Otro">Otro</option>
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Descripción Detallada del Problema *</label>
-                            <textarea class="form-control" id="faultDescription" rows="3" placeholder="Describe qué ocurre con el equipo y desde cuándo..." required></textarea>
+                        <div class="mb-2">
+                            <label for="faultDescription" class="form-label fw-semibold mb-1">Descripción de la Falla</label>
+                            <textarea class="form-control form-control-sm" id="faultDescription" rows="3" required placeholder="Describe qué ocurre con el equipo..."></textarea>
                         </div>
 
                         <div class="mb-2">
-                            <label class="form-label fw-semibold">Evidencia Fotográfica de la Falla (Opcional)</label>
-                            <input type="file" class="form-control" id="faultPhotoInput" accept="image/*" capture="environment" onchange="previewImageFile(event, 'faultPhotoPreview', 'faultPhotoImg', 'currentFaultPhoto')">
-                            <div id="faultPhotoPreview" class="mt-2 d-none text-center">
-                                <img id="faultPhotoImg" src="" alt="Evidencia" class="img-thumbnail" style="max-height: 110px;">
+                            <label for="faultPhotoInput" class="form-label fw-semibold mb-1">Foto de Evidencia (Opcional)</label>
+                            <input type="file" class="form-control form-control-sm" id="faultPhotoInput" accept="image/*" onchange="previewImageFile(event, 'faultPhotoPreview', 'faultPhotoImg', 'currentFaultPhoto')">
+                            <div id="faultPhotoPreview" class="d-none mt-2 d-flex align-items-center gap-2">
+                                <img id="faultPhotoImg" src="" alt="Evidencia" class="img-thumb">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearImageField('faultPhotoInput', 'faultPhotoPreview', 'currentFaultPhoto')">Quitar foto</button>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-danger fw-bold">
-                            <i class="bi bi-printer-fill me-1"></i>Crear Ticket e Imprimir Hoja de Servicio
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger btn-sm fw-semibold">
+                            <i class="bi bi-send-fill me-1"></i>Generar Ticket e Imprimir Hoja
                         </button>
                     </div>
                 </form>
@@ -661,64 +676,63 @@
         </div>
     </div>
 
-    <!-- ================= MODAL SEGUIMIENTO Y CIERRE DE TICKET ================= -->
-    <div class="modal fade" id="resolveFaultModal" tabindex="-1">
+    <!-- ==================== MODAL SEGUIMIENTO / CIERRE DE TICKET ==================== -->
+    <div class="modal fade" id="resolveFaultModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="bi bi-check-circle-fill me-2"></i>Seguimiento / Finalizar Ticket de Servicio</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-2"></i>Seguimiento y Cierre de Ticket</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="resolveFaultForm" onsubmit="submitResolveFault(event)">
                     <div class="modal-body">
                         <input type="hidden" id="resolveFaultId">
-                        <div class="alert alert-light border small mb-3">
-                            <div><strong>Ticket / Folio:</strong> <span id="resolveFolioInfo" class="fw-bold text-danger"></span></div>
-                            <div><strong>Equipo:</strong> <span id="resolveCompInfo"></span></div>
-                            <div><strong>Falla Original:</strong> <span id="resolveOriginalDesc" class="text-muted"></span></div>
+                        <div class="p-2 rounded bg-light border mb-3">
+                            <div class="fw-bold text-danger font-monospace" id="resolveFolioInfo"></div>
+                            <div class="fw-semibold" id="resolveCompInfo"></div>
+                            <div class="text-muted mt-1" id="resolveOriginalDesc"></div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Estatus de Seguimiento del Ticket *</label>
-                            <select class="form-select" id="resolveStatusSelect" required>
-                                <option value="En Seguimiento / Diagnóstico">En Seguimiento / Diagnóstico (Mantener abierto)</option>
-                                <option value="Finalizada" selected>Finalizada / Arreglada (Cerrar Ticket)</option>
+                        <div class="mb-2">
+                            <label for="resolveStatusSelect" class="form-label fw-semibold mb-1">Estatus del Ticket</label>
+                            <select class="form-select form-select-sm" id="resolveStatusSelect">
+                                <option value="En Seguimiento">En Seguimiento</option>
+                                <option value="Finalizada">Finalizada</option>
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Nombre del Técnico / Responsable de Atención *</label>
-                            <input type="text" class="form-control" id="resolveTechnician" placeholder="Ej. Ing. Soporte Técnico / Vocalía RFE" required>
+                        <div class="mb-2">
+                            <label for="resolveTechnician" class="form-label fw-semibold mb-1">Técnico / Responsable que Atiende</label>
+                            <input type="text" class="form-control form-control-sm" id="resolveTechnician" required placeholder="Nombre de quien realiza la atención">
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Tipo de Atención / Solución *</label>
-                            <select class="form-select" id="resolveActionType" required>
-                                <option value="Reparación / Ajuste en sitio">Reparación / Ajuste en sitio</option>
-                                <option value="Reinstalación de controladores / Software">Reinstalación de controladores / Software</option>
-                                <option value="Sustitución de cableado / Accesorios">Sustitución de cableado / Accesorios</option>
-                                <option value="Reemplazo completo de componente">Reemplazo completo de componente</option>
-                                <option value="Mantenimiento preventivo / Limpieza">Mantenimiento preventivo / Limpieza</option>
-                                <option value="Escalado a Soporte Nacional / Garantía">Escalado a Soporte Nacional / Garantía</option>
+                        <div class="mb-2">
+                            <label for="resolveActionType" class="form-label fw-semibold mb-1">Tipo de Solución / Acción</label>
+                            <select class="form-select form-select-sm" id="resolveActionType">
+                                <option value="Configuración / Ajuste">Configuración / Ajuste</option>
+                                <option value="Reemplazo de Pieza / Cable">Reemplazo de Pieza / Cable</option>
+                                <option value="Limpieza / Mantenimiento">Limpieza / Mantenimiento</option>
+                                <option value="Reinstalación / Drivers">Reinstalación / Drivers</option>
+                                <option value="Escalado a Soporte Central">Escalado a Soporte Central</option>
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Bitácora de Seguimiento / Trabajos Realizados *</label>
-                            <textarea class="form-control" id="resolveNotes" rows="3" placeholder="Detalla el seguimiento o cómo se solucionó la falla..." required></textarea>
+                        <div class="mb-2">
+                            <label for="resolveNotes" class="form-label fw-semibold mb-1">Notas de Seguimiento / Dictamen</label>
+                            <textarea class="form-control form-control-sm" id="resolveNotes" rows="3" required placeholder="Detalla los trabajos realizados o pruebas..."></textarea>
                         </div>
 
-                        <div class="form-check form-switch">
+                        <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" id="resolveRestoreComponent" checked>
-                            <label class="form-check-label small fw-semibold" for="resolveRestoreComponent">
-                                Cambiar estado del equipo a "Operativo" al finalizar el ticket
+                            <label class="form-check-label" for="resolveRestoreComponent">
+                                Marcar componente como <strong>Operativo</strong> al finalizar
                             </label>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-success fw-bold">
-                            <i class="bi bi-file-earmark-check-fill me-1"></i>Guardar e Imprimir Hoja de Servicio
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success btn-sm fw-semibold">
+                            <i class="bi bi-check-lg me-1"></i>Guardar e Imprimir Hoja
                         </button>
                     </div>
                 </form>
@@ -726,64 +740,63 @@
         </div>
     </div>
 
-    <!-- ================= MODAL VISTA PREVIA HOJA DE SERVICIO IMPRIMIBLE ================= -->
-    <div class="modal fade" id="printModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <!-- ==================== MODAL IMPRESIÓN HOJA DE SERVICIO ==================== -->
+    <div class="modal fade" id="printModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header bg-dark text-white no-print">
-                    <h5 class="modal-title" id="printModalHeaderTitle"><i class="bi bi-printer me-2"></i>Hoja de Servicio</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header no-print">
+                    <h5 id="printModalHeaderTitle" class="modal-title">Hoja de Servicio</h5>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-dark btn-sm" onclick="window.print()">
+                            <i class="bi bi-printer me-1"></i>Imprimir
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
                 </div>
-                <div class="modal-body bg-secondary-subtle">
-                    <div id="printFormatArea" class="print-sheet shadow-sm mx-auto"></div>
-                </div>
-                <div class="modal-footer no-print">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="button" class="btn btn-pink fw-bold" onclick="window.print()">
-                        <i class="bi bi-printer-fill me-1"></i>Imprimir / Guardar en PDF
-                    </button>
+                <div class="modal-body bg-light">
+                    <div id="printFormatArea" class="print-sheet mx-auto"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ================= MODAL ESCÁNER DE CÓDIGO DE BARRAS ================= -->
-    <div class="modal fade" id="scannerModal" tabindex="-1" data-bs-backdrop="static">
+    <!-- ==================== MODAL ESCÁNER DE CÓDIGO ==================== -->
+    <div class="modal fade" id="scannerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title"><i class="bi bi-upc-scan me-2"></i>Escanear Código de Barras / QR</h5>
-                    <button type="button" class="btn-close btn-close-white" onclick="closeScanner()"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upc-scan text-danger me-2"></i>Escanear Código de Barras / QR</h5>
+                    <button type="button" class="btn-close" onclick="closeScanner()"></button>
                 </div>
                 <div class="modal-body text-center">
-                    <div id="reader"></div>
-                    <p class="text-muted small mt-2 mb-0">Apunta la cámara del celular o webcam hacia la etiqueta del código de barras del equipo.</p>
+                    <div id="reader" style="width: 100%; min-height: 240px;"></div>
+                    <div class="text-muted mt-2">Alinea el código de serie o inventario dentro del recuadro.</div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary w-100" onclick="closeScanner()">Cancelar</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeScanner()">Cerrar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ================= MODAL VISTA PREVIA DE FOTOGRAFÍA ================= -->
-    <div class="modal fade" id="photoModal" tabindex="-1">
+    <!-- ==================== MODAL VISOR DE FOTOGRAFÍA ==================== -->
+    <div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark text-white">
-                <div class="modal-header border-0">
-                    <h6 class="modal-title" id="photoModalTitle">Fotografía</h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="photoModalTitle" class="modal-title">Fotografía</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body text-center p-2">
-                    <img id="modalFullImage" src="" class="img-fluid rounded" alt="Imagen ampliada">
+                <div class="modal-body text-center bg-light">
+                    <img id="modalFullImage" src="" alt="Fotografía ampliada" class="img-fluid rounded border">
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Lógica Principal Conectada a Firebase -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
 </html>
