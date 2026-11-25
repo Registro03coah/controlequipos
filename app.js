@@ -53,6 +53,7 @@ function normalizeComponentRecord(raw = {}) {
         modelo: String(raw.modelo ?? "").trim(),
         numero_serie: String(raw.numero_serie ?? raw.serie ?? "").trim().toUpperCase(),
         inventario_ine: String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
+        serie_cpu_vinculada: String(raw.serie_cpu_vinculada ?? raw.serieCpuVinculada ?? "").trim().toUpperCase(),
         estado_fisico: String(raw.estado_fisico ?? raw.estado ?? "Operativo").trim(),
         observaciones: String(raw.observaciones ?? raw.notas ?? "").trim(),
         foto_url: String(raw.foto_url ?? raw.foto ?? ""),
@@ -128,7 +129,7 @@ function migrateStateToV2(raw = {}) {
     return { migratedState, needsCloudSync };
 }
 
-// ==================== ÍCONOS POR TIPO DE COMPONENTE ====================
+// ==================== ÍCONOS Y VINCULACIÓN CPU <-> MONITOR ====================
 function getComponentIcon(tipo) {
     const t = String(tipo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (t.includes("laptop") || t.includes("portatil")) return "bi-laptop";
@@ -143,6 +144,69 @@ function getComponentIcon(tipo) {
     if (t.includes("escaner") || t.includes("digitalizador")) return "bi-file-earmark-ruled-fill";
     if (t.includes("break") || t.includes("ups") || t.includes("energia")) return "bi-battery-charging";
     return "bi-cpu-fill";
+}
+
+function isMonitorType(tipo) {
+    const t = String(tipo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return t.includes("monitor") || t.includes("pantalla");
+}
+
+function isCpuType(tipo) {
+    const t = String(tipo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return t.includes("computadora") || t.includes("cpu") || t.includes("pc") || t.includes("servidor") || t.includes("laptop");
+}
+
+function getAvailableCpusForStation(modulo, estacion) {
+    return appState.componentes.filter(c =>
+        c.modulo === String(modulo).padStart(6, "0") &&
+        Number(c.estacion) === Number(estacion) &&
+        isCpuType(c.tipo_componente)
+    );
+}
+
+function updateCpuLinkSelector(currentSerieValue = "") {
+    const tipo = document.getElementById("compTipo").value;
+    const container = document.getElementById("compCpuLinkContainer");
+    const selectEl = document.getElementById("compCpuSelect");
+    const inputEl = document.getElementById("compSerieCpuVinculada");
+
+    if (!container || !selectEl || !inputEl) return;
+
+    if (!isMonitorType(tipo)) {
+        container.classList.add("d-none");
+        selectEl.innerHTML = `<option value="">-- Seleccionar CPU registrado --</option>`;
+        inputEl.value = "";
+        return;
+    }
+
+    container.classList.remove("d-none");
+
+    const ctx = document.getElementById("compFormContext").value;
+    const modulo = ctx === "op" && currentUser ? currentUser.modulo : document.getElementById("compModulo").value;
+    const estacion = ctx === "op" && currentUser ? Number(currentUser.estacion) : Number(document.getElementById("compEstacion").value);
+
+    const cpus = getAvailableCpusForStation(modulo, estacion);
+    const valUpper = String(currentSerieValue || inputEl.value || "").trim().toUpperCase();
+
+    selectEl.innerHTML = `<option value="">-- Seleccionar CPU en ${modulo} / ${formatStationLabel(estacion)} --</option>` +
+        cpus.map(cpu => `<option value="${cpu.numero_serie}">${cpu.numero_serie} (${cpu.marca} ${cpu.modelo})</option>`).join("");
+
+    if (valUpper) {
+        inputEl.value = valUpper;
+        selectEl.value = [...selectEl.options].some(o => o.value === valUpper) ? valUpper : "";
+    } else if (cpus.length === 1) {
+        selectEl.value = cpus[0].numero_serie;
+        inputEl.value = cpus[0].numero_serie;
+    } else {
+        selectEl.value = "";
+    }
+}
+
+function onCompCpuSelectChange() {
+    const selVal = document.getElementById("compCpuSelect").value;
+    if (selVal) {
+        document.getElementById("compSerieCpuVinculada").value = selVal;
+    }
 }
 
 // ==================== PERSISTENCIA DE SESIÓN AL REFRESCAR ====================
@@ -276,6 +340,7 @@ function applyModalBrandLockState() {
 
 function onModalBrandOrTypeChange() {
     applyModalBrandLockState();
+    updateCpuLinkSelector();
 }
 
 function openComponentModal(context = "admin", compToEdit = null) {
@@ -310,6 +375,8 @@ function openComponentModal(context = "admin", compToEdit = null) {
         document.getElementById("compModelo").value = compToEdit.modelo;
         document.getElementById("compSerie").value = compToEdit.numero_serie;
         document.getElementById("compInventarioIne").value = compToEdit.inventario_ine || "";
+        const cpuInput = document.getElementById("compSerieCpuVinculada");
+        if (cpuInput) cpuInput.value = compToEdit.serie_cpu_vinculada || "";
         document.getElementById("compEstado").value = compToEdit.estado_fisico;
         document.getElementById("compNotas").value = compToEdit.observaciones || "";
 
@@ -320,12 +387,15 @@ function openComponentModal(context = "admin", compToEdit = null) {
         }
     } else {
         document.getElementById("editCompId").value = "";
+        const cpuInput = document.getElementById("compSerieCpuVinculada");
+        if (cpuInput) cpuInput.value = "";
         document.getElementById("compModalTitle").innerHTML = context === "op"
             ? `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en mi Estacion`
             : `<i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente en Estacion`;
     }
 
     applyModalBrandLockState();
+    updateCpuLinkSelector(compToEdit ? compToEdit.serie_cpu_vinculada : "");
     new bootstrap.Modal(document.getElementById("componentModal")).show();
 }
 
@@ -342,6 +412,9 @@ async function saveComponentFromModal(e) {
     const modelo = document.getElementById("compModelo").value.trim();
     const numero_serie = document.getElementById("compSerie").value.trim().toUpperCase();
     const inventario_ine = document.getElementById("compInventarioIne").value.trim().toUpperCase();
+    const serie_cpu_vinculada = isMonitorType(tipo_componente)
+        ? (document.getElementById("compSerieCpuVinculada")?.value || "").trim().toUpperCase()
+        : "";
     const estado_fisico = document.getElementById("compEstado").value;
     const observaciones = document.getElementById("compNotas").value.trim();
 
@@ -363,6 +436,7 @@ async function saveComponentFromModal(e) {
                 modelo,
                 numero_serie,
                 inventario_ine,
+                serie_cpu_vinculada,
                 estado_fisico,
                 observaciones,
                 foto_url: currentCompPhoto || appState.componentes[idx].foto_url,
@@ -379,6 +453,7 @@ async function saveComponentFromModal(e) {
             modelo,
             numero_serie,
             inventario_ine,
+            serie_cpu_vinculada,
             estado_fisico,
             observaciones,
             foto_url: currentCompPhoto,
@@ -439,6 +514,9 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                             const isServer = Number(c.estacion) === 0;
                             const isNA = c.estado_fisico === "No Aplica" || c.marca === "NO APLICA";
                             const itemIcon = getComponentIcon(c.tipo_componente);
+                            const linkedMonitors = isCpuType(c.tipo_componente)
+                                ? appState.componentes.filter(m => isMonitorType(m.tipo_componente) && m.serie_cpu_vinculada === c.numero_serie)
+                                : [];
                             return `
                                 <tr>
                                     <td>
@@ -448,6 +526,12 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                     </td>
                                     <td class="fw-bold">
                                         <i class="bi ${itemIcon} text-danger me-1"></i>${c.tipo_componente}
+                                        ${isMonitorType(c.tipo_componente) && c.serie_cpu_vinculada
+                                            ? `<div class="text-primary mt-1 fw-normal"><i class="bi bi-link-45deg"></i>CPU: <strong class="font-monospace">${c.serie_cpu_vinculada}</strong></div>`
+                                            : ""}
+                                        ${linkedMonitors.length
+                                            ? `<div class="text-info-emphasis mt-1 fw-normal"><i class="bi bi-display"></i>Monitor: <strong class="font-monospace">${linkedMonitors.map(m => m.numero_serie).join(", ")}</strong></div>`
+                                            : ""}
                                     </td>
                                     ${showLocation ? `
                                         <td>
@@ -925,11 +1009,13 @@ function onAdminCompModuloChange() {
     fillStationOptions(document.getElementById("compEstacion"), modulo, { selectedValue: 0 });
     updateCompAssignedOperatorHint();
     applyModalBrandLockState();
+    updateCpuLinkSelector();
 }
 
 function onAdminStationOrBrandChange() {
     updateCompAssignedOperatorHint();
     applyModalBrandLockState();
+    updateCpuLinkSelector();
 }
 
 function updateCompAssignedOperatorHint() {
@@ -967,7 +1053,7 @@ function renderAdminInventoryGrouped() {
             const op = getOperatorByStation(c.modulo, c.estacion);
             const opName = op ? op.nombre_completo.toLowerCase() : "";
             const estText = formatStationLabel(c.estacion).toLowerCase();
-            const haystack = `${c.numero_serie} ${c.inventario_ine || ""} ${c.marca} ${c.modelo} ${c.tipo_componente} ${c.estado_fisico} ${opName} ${estText}`.toLowerCase();
+            const haystack = `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.marca} ${c.modelo} ${c.tipo_componente} ${c.estado_fisico} ${opName} ${estText}`.toLowerCase();
             if (!haystack.includes(search)) return false;
         }
         return true;
@@ -1497,30 +1583,33 @@ function downloadImportTemplate() {
             "modelo": "PowerEdge",
             "numero_serie": "J101CBVA",
             "inventario_ine": "",
+            "serie_cpu_vinculada": "",
             "estado_fisico": "Operativo",
             "observaciones": "Servidor 050351"
         },
         {
             "modulo": "050351",
             "estacion": 1,
-            "tipo_componente": "Camara Fotografica",
-            "marca": "Canon",
-            "modelo": "EOS REBEL T7",
-            "numero_serie": "182072002447",
+            "tipo_componente": "Computadora / CPU",
+            "marca": "Dell",
+            "modelo": "OptiPlex",
+            "numero_serie": "CPU001TEST",
             "inventario_ine": "",
+            "serie_cpu_vinculada": "",
             "estado_fisico": "Operativo",
             "observaciones": "Cliente 1"
         },
         {
             "modulo": "050351",
             "estacion": 1,
-            "tipo_componente": "Pad de Firmas",
-            "marca": "Wacom",
-            "modelo": "STU-540",
-            "numero_serie": "1AQ0021006261",
+            "tipo_componente": "Monitor",
+            "marca": "Dell",
+            "modelo": "P2222H",
+            "numero_serie": "MON001TEST",
             "inventario_ine": "",
+            "serie_cpu_vinculada": "CPU001TEST",
             "estado_fisico": "Operativo",
-            "observaciones": "Cliente 1"
+            "observaciones": "Monitor vinculado a CPU001TEST"
         }
     ];
 
@@ -1528,7 +1617,7 @@ function downloadImportTemplate() {
     const ws = XLSX.utils.json_to_sheet(sampleRows);
     ws["!cols"] = [
         { wch: 10 }, { wch: 10 }, { wch: 24 }, { wch: 15 },
-        { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 25 }
+        { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 25 }
     ];
     XLSX.utils.book_append_sheet(wb, ws, "plantilla_importacion");
     XLSX.writeFile(wb, "plantilla_importacion_macs.xlsx");
@@ -1571,6 +1660,7 @@ async function importInventoryExcel(event) {
             const marca = marcaRaw.toUpperCase() === "NO APLICA" ? "NO APLICA" : marcaRaw;
             const modelo = String(raw["modelo"] ?? raw["Modelo"] ?? (marca === "NO APLICA" ? "NO APLICA" : "N/A")).trim() || "N/A";
             const inventario_ine = String(raw["inventario_ine"] ?? raw["InventarioINE"] ?? raw["Inventario INE"] ?? "").trim().toUpperCase();
+            const serie_cpu_vinculada = String(raw["serie_cpu_vinculada"] ?? raw["SerieCpuVinculada"] ?? "").trim().toUpperCase();
             const observaciones = String(raw["observaciones"] ?? raw["Notas"] ?? "").trim();
 
             let numero_serie = String(raw["numero_serie"] ?? raw["Serie"] ?? raw["Número de Serie"] ?? "").trim().toUpperCase();
@@ -1617,6 +1707,7 @@ async function importInventoryExcel(event) {
                 modelo,
                 numero_serie,
                 inventario_ine,
+                serie_cpu_vinculada: isMonitorType(tipo_componente) ? serie_cpu_vinculada : "",
                 estado_fisico,
                 observaciones,
                 foto_url: "",
@@ -1665,6 +1756,7 @@ function exportInventoryExcel() {
             "modelo": c.modelo,
             "numero_serie": c.numero_serie,
             "inventario_ine": c.inventario_ine || "",
+            "serie_cpu_vinculada": c.serie_cpu_vinculada || "",
             "estado_fisico": c.estado_fisico,
             "registrado_por": c.registrado_por || "Administrador",
             "observaciones": c.observaciones || "",
@@ -1677,7 +1769,7 @@ function exportInventoryExcel() {
     ws["!cols"] = [
         { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 28 }, { wch: 16 },
         { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 22 },
-        { wch: 20 }, { wch: 14 }, { wch: 22 }, { wch: 25 }, { wch: 20 }
+        { wch: 20 }, { wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 25 }, { wch: 20 }
     ];
     XLSX.utils.book_append_sheet(wb, ws, "inventario_componentes");
 
@@ -1751,6 +1843,7 @@ Object.assign(window, {
     openComponentModal,
     saveComponentFromModal,
     onModalBrandOrTypeChange,
+    onCompCpuSelectChange,
     editComponentById,
     switchAdminTab,
     onAdminCompModuloChange,
