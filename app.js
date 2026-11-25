@@ -2991,5 +2991,3 @@ Object.assign(window, {
     exportInventoryExcel,
     exportFaultsExcel
 });
-
-
