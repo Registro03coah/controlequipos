@@ -284,7 +284,7 @@
                                 </div>
 
                                 <div class="col-12 col-md-3">
-                                    <label for="adminSearchInput" class="form-label fw-semibold mb-1">Buscar (Serie, Inv. INE, CPU, Lente)</label>
+                                    <label for="adminSearchInput" class="form-label fw-semibold mb-1">Buscar (Serie, Inv. INE, CPU, Lente, Docking)</label>
                                     <input type="text" class="form-control form-control-sm" id="adminSearchInput" placeholder="Escribe para buscar..." oninput="renderAdminInventoryGrouped()">
                                 </div>
 
@@ -603,6 +603,16 @@
                                         <i class="bi bi-camera-reels-fill text-danger me-1"></i>Serie del Lente (Cámara)
                                     </label>
                                     <input type="text" class="form-control form-control-sm text-uppercase" id="compSerieLente" placeholder="Ej. 7797051400">
+                                </div>
+                            </div>
+
+                            <!-- Serie de Docking para Laptops -->
+                            <div class="col-12 d-none" id="compDockingLinkContainer">
+                                <div class="p-2 rounded border bg-light">
+                                    <label for="compSerieDocking" class="form-label fw-semibold mb-1">
+                                        <i class="bi bi-usb-plug-fill text-danger me-1"></i>Serie del Docking (Laptop)
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm text-uppercase" id="compSerieDocking" placeholder="Ej. ZVQ1GKN6">
                                 </div>
                             </div>
 
