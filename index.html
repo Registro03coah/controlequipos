@@ -846,6 +846,48 @@
 
     <!-- ==================== MODALES ==================== -->
 
+    <!-- Modal Asignar Equipo desde Stock a Módulo / Estación -->
+    <div class="modal fade" id="assignStockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-box-arrow-up-right me-2"></i>Asignar Equipo de Stock a Estación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="assignStockForm" onsubmit="submitAssignStock(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="assignStockId">
+                        <div id="assignStockSummary" class="p-3 bg-light rounded border mb-3"></div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Módulo Destino</label>
+                            <select id="assignStockModulo" class="form-select" onchange="populateAssignStockEstaciones(0)" required>
+                                <option value="050351">Módulo 050351</option>
+                                <option value="050353">Módulo 050353</option>
+                                <option value="050354">Módulo 050354</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Estación Destino</label>
+                            <select id="assignStockEstacion" class="form-select" onchange="updateAssignStockOperatorHint()" required></select>
+                            <small id="assignStockOperatorHint" class="d-block mt-1"></small>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Observaciones</label>
+                            <textarea id="assignStockObservaciones" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-semibold">Confirmar Asignación</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Registrar / Editar Componente -->
     <div class="modal fade" id="componentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
