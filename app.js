@@ -2973,6 +2973,38 @@ function exportFaultsExcel() {
     const fecha = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `tickets_fallas_macs_${fecha}.xlsx`);
 }
+// ==================== IMPRESIÓN LIMPIA DE REPORTES ====================
+function printReportArea() {
+    const sourceEl = document.getElementById("printFormatArea");
+    if (!sourceEl || !sourceEl.innerHTML.trim()) {
+        alert("No hay contenido de reporte listo para imprimir.");
+        return;
+    }
+
+    let printHost = document.getElementById("printSheetContainer");
+    if (!printHost) {
+        printHost = document.createElement("div");
+        printHost.id = "printSheetContainer";
+        document.body.appendChild(printHost);
+    }
+
+    printHost.innerHTML = sourceEl.innerHTML;
+
+    let cleaned = false;
+    const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        if (printHost) printHost.innerHTML = "";
+        window.removeEventListener("afterprint", cleanup);
+    };
+
+    window.addEventListener("afterprint", cleanup);
+
+    setTimeout(() => {
+        window.print();
+        setTimeout(cleanup, 1000);
+    }, 80);
+}
 
 // ==================== EXPOSICIÓN GLOBAL PARA EVENTOS HTML ====================
 Object.assign(window, {
