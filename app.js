@@ -3061,6 +3061,7 @@ Object.assign(window, {
     openResolveFaultModal,
     submitResolveFault,
     openPrintFaultFormat,
+    printReportArea,
     openScanner,
     closeScanner,
     replaceMac050351WithNewTable,
