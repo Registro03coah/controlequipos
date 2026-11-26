@@ -775,7 +775,6 @@ function editComponentById(id) {
     const ctx = currentUser && currentUser.role === "operator" ? "op" : "admin";
     openComponentModal(ctx, c);
 }
-
 // ==================== APARTADO DE STOCK / BODEGA Y DESINCORPORACIÓN ====================
 function onStockStatusChange() {
     const estatus = document.getElementById("stockEstatus").value;
@@ -2973,6 +2972,7 @@ function exportFaultsExcel() {
     const fecha = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `tickets_fallas_macs_${fecha}.xlsx`);
 }
+
 // ==================== IMPRESIÓN LIMPIA DE REPORTES ====================
 function printReportArea() {
     const sourceEl = document.getElementById("printFormatArea");
