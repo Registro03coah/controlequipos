@@ -4,324 +4,331 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventario de Equipo MAC - Módulos 050351 • 050353 • 050354</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1b396b">
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then((reg) => console.log('Service Worker registrado con éxito', reg))
-            .catch((err) => console.log('Error al registrar Service Worker', err));
-        });
-      }
-    </script>
+
+    <!-- Bootstrap 5 + Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- SheetJS (XLSX) para importar y exportar Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- html5-qrcode para escaneo con cámara -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
     <style>
         :root {
-            --mac-primary: #2B2A2E;
-            --mac-secondary: #1B1A1E;
-            --mac-accent: #D5007F;
-            --mac-accent-hover: #B00068;
-            --mac-bg: #F3F4F6;
+            --mac-primary: #b91c1c;
+            --mac-dark: #0f172a;
+            --mac-pink: #d5007f;
         }
+
         body {
-            background-color: var(--mac-bg);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 0.92rem;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         }
-        .navbar-mac {
-            background: linear-gradient(90deg, var(--mac-secondary) 0%, var(--mac-primary) 100%);
-            border-bottom: 3px solid var(--mac-accent);
-        }
-        .btn-pink {
-            background-color: var(--mac-accent);
-            border-color: var(--mac-accent);
-            color: #fff;
-        }
-        .btn-pink:hover, .btn-pink:focus {
-            background-color: var(--mac-accent-hover);
-            border-color: var(--mac-accent-hover);
-            color: #fff;
-        }
-        .text-pink {
-            color: var(--mac-accent) !important;
-        }
+
         .login-wrapper {
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: radial-gradient(circle at top right, #3c3a40, #161518);
-            padding: 1rem;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #7f1d1d 100%);
         }
-        .login-card {
-            max-width: 470px;
-            width: 100%;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+
+        .btn-pink {
+            background-color: var(--mac-pink);
+            border-color: var(--mac-pink);
+            color: #ffffff;
         }
-        .login-header {
-            background: var(--mac-secondary);
-            color: #fff;
-            padding: 1.5rem;
-            text-align: center;
-            border-bottom: 3px solid var(--mac-accent);
+
+        .btn-pink:hover {
+            background-color: #b00068;
+            border-color: #b00068;
+            color: #ffffff;
         }
+
+        .text-pink {
+            color: var(--mac-pink);
+        }
+
         .avatar-preview {
-            width: 74px;
-            height: 74px;
+            width: 72px;
+            height: 72px;
             object-fit: cover;
             border-radius: 50%;
-            border: 3px solid var(--mac-accent);
-            background: #e5e7eb;
+            border: 2px solid #cbd5e1;
         }
+
         .avatar-table {
-            width: 42px;
-            height: 42px;
+            width: 44px;
+            height: 44px;
             object-fit: cover;
             border-radius: 50%;
-            border: 2px solid #d1d5db;
-        }
-        .img-thumb {
-            width: 50px;
-            height: 50px;
-            object-fit: cover;
-            border-radius: 8px;
             border: 1px solid #cbd5e1;
             cursor: pointer;
         }
+
+        .img-thumb {
+            width: 54px;
+            height: 42px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+        }
+
         .stat-card {
-            border: none;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            background: #ffffff;
             transition: transform 0.15s ease;
         }
-        .stat-card:hover { transform: translateY(-2px); }
-        .nav-pills .nav-link.active {
-            background-color: var(--mac-accent);
+
+        .stat-card:hover {
+            transform: translateY(-2px);
         }
-        .nav-pills .nav-link {
-            color: #374151;
-            font-weight: 600;
+
+        /* Contenedor exclusivo para impresión */
+        #printSheetContainer {
+            display: none;
         }
-        #reader {
-            width: 100%;
-            min-height: 260px;
-            background: #000;
-            border-radius: 10px;
-            overflow: hidden;
-        }
+
         .print-box {
-            border: 1.5px solid #334155;
-            border-radius: 8px;
-            padding: 14px;
-            margin-bottom: 14px;
-            background: #fff;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            background: #ffffff;
         }
+
         .print-box-title {
             font-weight: 700;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            color: #1e293b;
             border-bottom: 1px solid #cbd5e1;
             padding-bottom: 4px;
             margin-bottom: 8px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
         }
+
         .print-box-title-solved {
             font-weight: 700;
-            font-size: 0.85rem;
-            text-transform: uppercase;
             color: #065f46;
             border-bottom: 1px solid #a7f3d0;
             padding-bottom: 4px;
             margin-bottom: 8px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
         }
+
         @media print {
-            body * { visibility: hidden !important; }
-            #printFormatArea, #printFormatArea * { visibility: visible !important; }
-            #printFormatArea {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                padding: 10px;
-                font-size: 12px;
+            @page {
+                size: letter portrait;
+                margin: 10mm;
             }
-            .no-print { display: none !important; }
+
+            html, body {
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+                overflow: visible !important;
+            }
+
+            body > *:not(#printSheetContainer) {
+                display: none !important;
+            }
+
+            .modal,
+            .modal-backdrop {
+                display: none !important;
+            }
+
+            #printSheetContainer {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                font-size: 11pt;
+                line-height: 1.35;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            #printSheetContainer .print-box {
+                border: 1px solid #1e293b !important;
+                border-radius: 6px !important;
+                padding: 10px 14px !important;
+                margin-bottom: 12px !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            #printSheetContainer img {
+                max-width: 100% !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
         }
     </style>
 </head>
 <body>
 
-<!-- ==================== PANTALLA DE INICIO DE SESIÓN ==================== -->
-<div id="loginScreen" class="login-wrapper">
-    <div class="card login-card border-0">
-        <div class="login-header">
-            <div class="d-flex justify-content-end mb-2">
-                <span id="loginSyncBadge" class="badge bg-secondary text-light">
-                    <i class="bi bi-cloud-arrow-down me-1"></i>Conectando...
-                </span>
-            </div>
-            <i class="bi bi-pc-display-horizontal fs-1 text-pink"></i>
-            <h4 class="fw-bold mt-2 mb-0">INVENTARIO DE EQUIPO MAC</h4>
-            <small class="text-light opacity-75">Módulos 050351 • 050353 • 050354</small>
-        </div>
-        <div class="card-body p-4 bg-white">
-            <ul class="nav nav-pills nav-fill mb-4 bg-light p-1 rounded-3">
-                <li class="nav-item">
-                    <button class="nav-link active rounded-3" id="tab-op-login" onclick="switchLoginTab('operator')">
-                        <i class="bi bi-person-badge me-1"></i>Operador / Resp.
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link rounded-3" id="tab-admin-login" onclick="switchLoginTab('admin')">
-                        <i class="bi bi-shield-lock me-1"></i>Administrador
-                    </button>
-                </li>
-            </ul>
-
-            <!-- Formulario Login Operador / Responsable -->
-            <form id="operatorLoginForm" onsubmit="loginAsOperator(event)">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Módulo MAC</label>
-                    <select id="loginModulo" class="form-select" onchange="onLoginModuloChange()">
-                        <option value="050351">Módulo 050351</option>
-                        <option value="050353">Módulo 050353</option>
-                        <option value="050354">Módulo 050354</option>
-                    </select>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Usuario (Responsable / Operador)</label>
-                    <select id="loginEstacion" class="form-select" onchange="previewOperatorProfile()"></select>
-                </div>
-
-                <div id="operatorPreviewBox" class="p-3 rounded-3 bg-light border mb-4 d-flex align-items-center gap-3">
-                    <img id="previewOpPhoto" src="" alt="Foto" class="avatar-preview">
-                    <div class="overflow-hidden">
-                        <div id="previewOpName" class="fw-bold text-dark text-truncate">Sin asignar</div>
-                        <div id="previewOpEmail" class="text-muted small text-truncate">Selecciona un usuario</div>
+    <!-- ==================== PANTALLA DE INICIO DE SESIÓN ==================== -->
+    <div id="loginScreen" class="login-wrapper d-flex align-items-center justify-content-center p-3">
+        <div class="card shadow-lg border-0 rounded-4" style="max-width: 460px; width: 100%;">
+            <div class="card-header bg-dark text-white p-4 rounded-top-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="badge bg-danger mb-2">03 JUNTA DISTRITAL • COAHUILA</span>
+                        <h4 class="fw-bold mb-1">Control de Equipo MAC</h4>
+                        <small class="text-light opacity-75">Módulos 050351 • 050353 • 050354</small>
                     </div>
+                    <span id="loginSyncBadge" class="badge bg-secondary">
+                        <i class="bi bi-cloud me-1"></i>Conectando...
+                    </span>
                 </div>
-
-                <button type="submit" class="btn btn-pink w-100 py-2 fw-bold rounded-3">
-                    <i class="bi bi-box-arrow-in-right me-2"></i>Ingresar al Sistema
-                </button>
-            </form>
-
-            <!-- Formulario Login Administrador -->
-            <form id="adminLoginForm" class="d-none" onsubmit="loginAsAdmin(event)">
-                <div class="alert alert-secondary small py-2">
-                    <i class="bi bi-info-circle me-1"></i>Acceso exclusivo para control global, estaciones, stock, traspasos, operadores y tickets de falla.
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Contraseña de Administrador</label>
-                    <input type="password" id="adminPassword" class="form-control" placeholder="Ingresa la contraseña" required>
-                </div>
-                <button type="submit" class="btn btn-dark w-100 py-2 fw-bold rounded-3">
-                    <i class="bi bi-shield-check me-2"></i>Iniciar Sesión como Admin
-                </button>
-            </form>
-        </div>
-        <div class="card-footer bg-light text-center text-muted py-2 small">
-            Control de Hardware y Tickets de Servicio • CarRivers Design
-        </div>
-    </div>
-</div>
-
-<!-- ==================== APLICACIÓN PRINCIPAL ==================== -->
-<div id="mainApp" class="d-none">
-    <nav class="navbar navbar-expand-lg navbar-dark navbar-mac sticky-top shadow-sm">
-        <div class="container-fluid">
-            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="#">
-                <i class="bi bi-pc-display-horizontal text-pink fs-4"></i>
-                <span>INVENTARIO MAC</span>
-            </a>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span id="cloudStatusBadge" class="badge bg-secondary text-light py-2 px-2">
-                    <i class="bi bi-cloud-arrow-down me-1"></i>Conectando...
-                </span>
-                <span id="sessionBadge" class="badge bg-dark border border-secondary py-2 px-3"></span>
-                <button class="btn btn-outline-light btn-sm" onclick="logout()">
-                    <i class="bi bi-box-arrow-right me-1"></i>Salir
-                </button>
             </div>
-        </div>
-    </nav>
 
-    <div class="container-fluid py-4 px-md-4">
+            <div class="card-body p-4">
+                <ul class="nav nav-pills nav-fill mb-4 bg-light p-1 rounded-3">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-semibold" id="tab-op-login" type="button" onclick="switchLoginTab('operator')">
+                            <i class="bi bi-person-badge me-1"></i>Operador / Resp.
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold" id="tab-admin-login" type="button" onclick="switchLoginTab('admin')">
+                            <i class="bi bi-shield-lock me-1"></i>Administrador
+                        </button>
+                    </li>
+                </ul>
 
-        <!-- ==================== VISTA OPERADOR / RESPONSABLE ==================== -->
-        <div id="operatorView" class="d-none">
-            <div class="card border-0 shadow-sm rounded-3 mb-4">
-                <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-                    <div class="d-flex align-items-center gap-3">
-                        <img id="opCardPhoto" src="" alt="Operador" class="avatar-preview">
+                <!-- Login Operador / Responsable -->
+                <form id="operatorLoginForm" onsubmit="loginAsOperator(event)">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Módulo de Atención Ciudadana</label>
+                        <select id="loginModulo" class="form-select" onchange="onLoginModuloChange()">
+                            <option value="050351">Módulo 050351</option>
+                            <option value="050353">Módulo 050353</option>
+                            <option value="050354">Módulo 050354</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Usuario / Estación</label>
+                        <select id="loginEstacion" class="form-select" onchange="previewOperatorProfile()"></select>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border mb-3 d-flex align-items-center gap-3">
+                        <img id="previewOpPhoto" src="" alt="Perfil" class="avatar-preview">
                         <div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span id="opCardModulo" class="badge bg-dark"></span>
-                                <span id="opCardEstacion" class="badge btn-pink"></span>
-                            </div>
-                            <h5 id="opCardName" class="fw-bold mb-0 mt-1"></h5>
-                            <div class="text-muted small">
-                                <i class="bi bi-telephone me-1"></i><span id="opCardPhone"></span> •
-                                <i class="bi bi-envelope me-1"></i><span id="opCardEmail"></span>
-                            </div>
+                            <div id="previewOpName" class="fw-bold text-dark">Cargando...</div>
+                            <small id="previewOpEmail" class="text-muted"></small>
                         </div>
                     </div>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-outline-dark fw-semibold" onclick="openComponentModal('op')">
-                            <i class="bi bi-plus-circle me-1"></i>Registrar Componente
-                        </button>
-                        <button class="btn btn-pink fw-semibold" onclick="switchOpTab('fallas')">
-                            <i class="bi bi-exclamation-triangle me-1"></i>Mis Tickets (<span id="opFaultCountBadge">0</span>)
-                        </button>
+
+                    <button type="submit" class="btn btn-danger w-100 py-2 fw-bold">
+                        <i class="bi bi-box-arrow-in-right me-1"></i>Ingresar al Módulo
+                    </button>
+                </form>
+
+                <!-- Login Administrador -->
+                <form id="adminLoginForm" class="d-none" onsubmit="loginAsAdmin(event)">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Contraseña de Administrador</label>
+                        <input type="password" id="adminPassword" class="form-control" placeholder="Ingresa la contraseña" required>
                     </div>
+                    <button type="submit" class="btn btn-dark w-100 py-2 fw-bold">
+                        <i class="bi bi-shield-check me-1"></i>Iniciar Sesión Global
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== APLICACIÓN PRINCIPAL ==================== -->
+    <div id="mainApp" class="d-none">
+        <!-- Barra superior -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+            <div class="container-fluid">
+                <span class="navbar-brand fw-bold">
+                    <i class="bi bi-pc-display-horizontal text-danger me-2"></i>Inventario MAC
+                </span>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span id="cloudStatusBadge" class="badge bg-secondary py-2 px-2">
+                        <i class="bi bi-cloud me-1"></i>Conectando...
+                    </span>
+                    <span id="sessionBadge" class="badge bg-light text-dark py-2 px-3"></span>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                        <i class="bi bi-box-arrow-right me-1"></i>Salir
+                    </button>
                 </div>
             </div>
+        </nav>
 
-            <ul class="nav nav-pills mb-3">
-                <li class="nav-item">
-                    <button class="nav-link active" id="op-tab-equipos" onclick="switchOpTab('equipos')">
-                        <i class="bi bi-cpu me-1"></i>Componentes de mi Estación
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="op-tab-fallas" onclick="switchOpTab('fallas')">
-                        <i class="bi bi-ticket-perforated me-1"></i>Tickets y Reportes de Falla
-                    </button>
-                </li>
-            </ul>
+        <div class="container-fluid py-4 px-3 px-md-4">
 
-            <div id="opSectionEquipos">
-                <div class="card border-0 shadow-sm rounded-3">
-                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h6 class="fw-bold mb-0"><i class="bi bi-list-check me-2 text-pink"></i>Componentes Asignados a la Estación</h6>
-                        <span id="opTotalComponents" class="badge bg-secondary">0 equipos</span>
-                    </div>
-                    <div class="card-body">
-                        <div id="opGroupedComponentsContainer"></div>
+            <!-- ==================== VISTA OPERADOR / RESPONSABLE ==================== -->
+            <div id="operatorView" class="d-none">
+                <div class="card border-0 shadow-sm rounded-3 mb-4">
+                    <div class="card-body d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <img id="opCardPhoto" src="" alt="Operador" class="avatar-preview">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span id="opCardModulo" class="badge bg-dark"></span>
+                                    <span id="opCardEstacion" class="badge bg-danger"></span>
+                                </div>
+                                <h5 id="opCardName" class="fw-bold mb-0 mt-1"></h5>
+                                <small class="text-muted">
+                                    <i class="bi bi-telephone me-1"></i><span id="opCardPhone"></span> •
+                                    <i class="bi bi-envelope me-1"></i><span id="opCardEmail"></span>
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-danger fw-semibold" onclick="openComponentModal('op')">
+                                <i class="bi bi-plus-circle me-1"></i>Agregar Equipo
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div id="opSectionFallas" class="d-none">
-                <div class="card border-0 shadow-sm rounded-3">
-                    <div class="card-header bg-white py-3">
-                        <h6 class="fw-bold mb-0"><i class="bi bi-ticket-perforated-fill me-2 text-danger"></i>Tickets de Servicio Generados en esta Estación</h6>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-semibold" id="op-tab-equipos" onclick="switchOpTab('equipos')">
+                            <i class="bi bi-cpu me-1"></i>Mis Equipos Asignados
+                            <span id="opTotalComponents" class="badge bg-secondary ms-1">0 equipos</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold" id="op-tab-fallas" onclick="switchOpTab('fallas')">
+                            <i class="bi bi-ticket-perforated me-1"></i>Tickets de Falla
+                            <span id="opFaultCountBadge" class="badge bg-danger ms-1">0</span>
+                        </button>
+                    </li>
+                </ul>
+
+                <div id="opSectionEquipos">
+                    <div id="opGroupedComponentsContainer"></div>
+                </div>
+
+                <div id="opSectionFallas" class="d-none">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body table-responsive">
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Folio Ticket</th>
+                                        <th>Folio</th>
                                         <th>Fecha</th>
-                                        <th>Componente</th>
-                                        <th>Falla Reportada</th>
-                                        <th>Estado</th>
+                                        <th>Equipo</th>
+                                        <th>Falla</th>
+                                        <th>Estatus</th>
                                         <th class="text-end">Acciones</th>
                                     </tr>
                                 </thead>
@@ -331,328 +338,324 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- ==================== VISTA ADMINISTRADOR ==================== -->
-        <div id="adminView" class="d-none">
-            <!-- Aviso inmediato cuando existan tickets pendientes -->
-            <div id="adminTicketAlertBar" class="alert alert-danger border-0 shadow-sm d-none align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                <div>
-                    <i class="bi bi-bell-fill me-2"></i>
-                    <strong>Atención:</strong> Hay <strong id="adminTicketAlertCount">0</strong> ticket(s) de falla abiertos pendientes de seguimiento o solución.
+            <!-- ==================== VISTA ADMINISTRADOR ==================== -->
+            <div id="adminView" class="d-none">
+                <!-- Alerta de tickets activos -->
+                <div id="adminTicketAlertBar" class="alert alert-warning d-none justify-content-between align-items-center shadow-sm mb-4">
+                    <div>
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Hay <strong id="adminTicketAlertCount">0</strong> ticket(s) de falla abiertos pendientes de seguimiento.
+                    </div>
+                    <button class="btn btn-sm btn-dark" onclick="switchAdminTab('fallas')">Ver Tickets</button>
                 </div>
-                <button class="btn btn-sm btn-light fw-bold text-danger" onclick="switchAdminTab('fallas')">
-                    <i class="bi bi-arrow-right-circle me-1"></i>Revisar Tickets
-                </button>
-            </div>
 
-            <!-- Tarjetas Resumen -->
-            <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
-                    <div class="card stat-card bg-white p-3">
-                        <div class="text-muted small fw-semibold">Total Componentes</div>
-                        <div id="adminStatTotal" class="fs-3 fw-bold text-dark">0</div>
+                <!-- Tarjetas de métricas -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card p-3 shadow-sm">
+                            <div class="text-muted small">Equipos Asignados</div>
+                            <div id="adminStatTotal" class="fs-3 fw-bold text-dark">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card p-3 shadow-sm">
+                            <div class="text-muted small">Operadores / Resp.</div>
+                            <div id="adminStatOperators" class="fs-3 fw-bold text-primary">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card p-3 shadow-sm">
+                            <div class="text-muted small">Estaciones Totales</div>
+                            <div id="adminStatStations" class="fs-3 fw-bold text-success">0</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-card p-3 shadow-sm">
+                            <div class="text-muted small">Tickets Abiertos</div>
+                            <div id="adminStatFaults" class="fs-3 fw-bold text-danger">0</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="card stat-card bg-white p-3">
-                        <div class="text-muted small fw-semibold">Operadores / Resp.</div>
-                        <div id="adminStatOperators" class="fs-3 fw-bold text-primary">0</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card stat-card bg-white p-3">
-                        <div class="text-muted small fw-semibold">Total Estaciones</div>
-                        <div id="adminStatStations" class="fs-3 fw-bold text-success">0</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card stat-card bg-white p-3">
-                        <div class="text-muted small fw-semibold">Tickets Abiertos</div>
-                        <div id="adminStatFaults" class="fs-3 fw-bold text-danger">0</div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Navegación Admin -->
-            <ul class="nav nav-pills mb-3 flex-wrap gap-1">
-                <li class="nav-item">
-                    <button class="nav-link active" id="adm-tab-inventario" onclick="switchAdminTab('inventario')">
-                        <i class="bi bi-hdd-stack me-1"></i>Inventario Global
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="adm-tab-stock" onclick="switchAdminTab('stock')">
-                        <i class="bi bi-box-seam me-1"></i>Stock / Baja <span id="admStockBadge" class="badge bg-dark ms-1">0</span>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="adm-tab-traspasos" onclick="switchAdminTab('traspasos')">
-                        <i class="bi bi-arrow-left-right me-1"></i>Traspasos y Reasignación
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="adm-tab-operadores" onclick="switchAdminTab('operadores')">
-                        <i class="bi bi-people me-1"></i>Operadores y Responsables
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="adm-tab-config" onclick="switchAdminTab('config')">
-                        <i class="bi bi-sliders me-1"></i>Estaciones y Catálogos
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="adm-tab-fallas" onclick="switchAdminTab('fallas')">
-                        <i class="bi bi-ticket-perforated me-1"></i>Tickets de Falla <span id="admFaultBadge" class="badge bg-danger ms-1">0</span>
-                    </button>
-                </li>
-            </ul>
+                <!-- Navegación Administrador -->
+                <ul class="nav nav-pills mb-4 gap-2 flex-wrap bg-white p-2 rounded-3 shadow-sm border">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-semibold" id="adm-tab-inventario" onclick="switchAdminTab('inventario')">
+                            <i class="bi bi-grid-3x3-gap me-1"></i>Inventario Global
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold" id="adm-tab-stock" onclick="switchAdminTab('stock')">
+                            <i class="bi bi-box-seam me-1"></i>Stock / Desincorporación
+                            <span id="admStockBadge" class="badge bg-secondary ms-1">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold" id="adm-tab-traspasos" onclick="switchAdminTab('traspasos')">
+                            <i class="bi bi-arrow-left-right me-1"></i>Traspasos
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold" id="adm-tab-operadores" onclick="switchAdminTab('operadores')">
+                            <i class="bi bi-people me-1"></i>Operadores
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold" id="adm-tab-fallas" onclick="switchAdminTab('fallas')">
+                            <i class="bi bi-ticket-perforated me-1"></i>Tickets de Fallas
+                            <span id="admFaultBadge" class="badge bg-danger ms-1">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold" id="adm-tab-config" onclick="switchAdminTab('config')">
+                            <i class="bi bi-gear me-1"></i>Estaciones y Catálogos
+                        </button>
+                    </li>
+                </ul>
 
-            <!-- TAB 1: INVENTARIO GLOBAL -->
-            <div id="admSectionInventario">
-                <div class="card border-0 shadow-sm rounded-3 mb-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                            <h6 class="fw-bold mb-0"><i class="bi bi-funnel me-2 text-pink"></i>Filtros y Acciones de Inventario</h6>
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button class="btn btn-pink btn-sm fw-semibold" onclick="openComponentModal('admin')">
-                                    <i class="bi bi-plus-circle me-1"></i>Registrar Componente
+                <!-- SECCIÓN 1: INVENTARIO GLOBAL -->
+                <div id="admSectionInventario">
+                    <div class="card border-0 shadow-sm rounded-3 mb-3">
+                        <div class="card-body">
+                            <div class="row g-2 align-items-center mb-3">
+                                <div class="col-md-2">
+                                    <select id="adminFilterModulo" class="form-select" onchange="renderAdminInventoryGrouped()">
+                                        <option value="ALL">Todos los Módulos</option>
+                                        <option value="050351">Módulo 050351</option>
+                                        <option value="050353">Módulo 050353</option>
+                                        <option value="050354">Módulo 050354</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select id="adminFilterTipo" class="form-select" onchange="renderAdminInventoryGrouped()">
+                                        <option value="ALL">Todos los Componentes</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" id="adminSearchInput" class="form-control" placeholder="Buscar por serie, inventario INE, estación, marca o usuario..." oninput="renderAdminInventoryGrouped()">
+                                </div>
+                                <div class="col-md-3 d-flex justify-content-md-end gap-2 flex-wrap">
+                                    <button class="btn btn-danger fw-semibold" onclick="openComponentModal('admin')">
+                                        <i class="bi bi-plus-circle me-1"></i>Nuevo Equipo
+                                    </button>
+                                    <button class="btn btn-success fw-semibold" onclick="exportInventoryExcel()">
+                                        <i class="bi bi-file-earmark-excel me-1"></i>Exportar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 flex-wrap pt-2 border-top">
+                                <button class="btn btn-outline-dark btn-sm" onclick="downloadImportTemplate()">
+                                    <i class="bi bi-download me-1"></i>Plantilla Excel
                                 </button>
-                                <button class="btn btn-outline-secondary btn-sm fw-semibold" onclick="downloadImportTemplate()">
-                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>Plantilla Excel
-                                </button>
-                                <label class="btn btn-outline-primary btn-sm fw-semibold mb-0" style="cursor:pointer;">
-                                    <i class="bi bi-file-earmark-arrow-up me-1"></i>Importar Excel/CSV
+                                <label class="btn btn-outline-primary btn-sm mb-0">
+                                    <i class="bi bi-upload me-1"></i>Importar Excel/CSV
                                     <input type="file" id="importExcelInput" accept=".xlsx,.xls,.csv" class="d-none" onchange="importInventoryExcel(event)">
                                 </label>
-                                <button class="btn btn-success btn-sm fw-semibold" onclick="exportInventoryExcel()">
-                                    <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
-                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="replaceMac050351WithNewTable()">Cargar Tabla 050351</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="replaceMac050353WithNewTable()">Cargar Tabla 050353</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="replaceMac050354WithNewTable()">Cargar Tabla 050354</button>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="row g-2">
-                            <div class="col-md-3">
-                                <label class="form-label small fw-semibold mb-1">Módulo</label>
-                                <select id="adminFilterModulo" class="form-select form-select-sm" onchange="renderAdminInventoryGrouped()">
-                                    <option value="ALL">Todos los Módulos</option>
-                                    <option value="050351">Módulo 050351</option>
-                                    <option value="050353">Módulo 050353</option>
-                                    <option value="050354">Módulo 050354</option>
-                                </select>
+                    <div id="adminGroupedComponentsContainer"></div>
+                </div>
+
+                <!-- SECCIÓN 2: STOCK / DESINCORPORACIÓN -->
+                <div id="admSectionStock" class="d-none">
+                    <div class="row g-3 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card p-3 shadow-sm">
+                                <div class="text-muted small">Total en Stock</div>
+                                <div id="stockStatTotal" class="fs-4 fw-bold">0</div>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label small fw-semibold mb-1">Componente</label>
-                                <select id="adminFilterTipo" class="form-select form-select-sm" onchange="renderAdminInventoryGrouped()">
-                                    <option value="ALL">Todos los Componentes</option>
-                                </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card p-3 shadow-sm">
+                                <div class="text-muted small">Disponibles (Stock)</div>
+                                <div id="stockStatDisponibles" class="fs-4 fw-bold text-info">0</div>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-semibold mb-1">Buscar (Serie, Inv. INE, Lente, Docking, Estación, Usuario o No Aplica)</label>
-                                <input type="text" id="adminSearchInput" class="form-control form-control-sm" placeholder="Ej. MZ006XB6, Estación 1, 7797051400, No Aplica..." oninput="renderAdminInventoryGrouped()">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card p-3 shadow-sm">
+                                <div class="text-muted small">En Falla</div>
+                                <div id="stockStatFalla" class="fs-4 fw-bold text-danger">0</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card p-3 shadow-sm">
+                                <div class="text-muted small">Desincorporados</div>
+                                <div id="stockStatDesinc" class="fs-4 fw-bold text-warning">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body">
+                            <div class="row g-2 mb-3 align-items-center">
+                                <div class="col-md-3">
+                                    <select id="stockFilterEstatus" class="form-select" onchange="renderAdminStockTable()">
+                                        <option value="ALL">Todos los Estatus</option>
+                                        <option value="Stock">Stock</option>
+                                        <option value="Falla">Falla</option>
+                                        <option value="Desincorporado">Desincorporado</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select id="stockFilterDesinc" class="form-select" onchange="renderAdminStockTable()">
+                                        <option value="ALL">Desincorporación: Todos</option>
+                                        <option value="Si">Desincorporado: Sí</option>
+                                        <option value="No">Desincorporado: No</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" id="stockSearchInput" class="form-control" placeholder="Buscar serie, oficio, destino..." oninput="renderAdminStockTable()">
+                                </div>
+                                <div class="col-md-3 d-flex justify-content-md-end gap-2">
+                                    <button class="btn btn-danger btn-sm fw-semibold" onclick="openStockModal()">
+                                        <i class="bi bi-plus-circle me-1"></i>Agregar a Stock
+                                    </button>
+                                    <button class="btn btn-success btn-sm fw-semibold" onclick="exportStockExcel()">
+                                        <i class="bi bi-file-earmark-excel me-1"></i>Exportar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Origen</th>
+                                            <th>Destino</th>
+                                            <th>Inv. INE</th>
+                                            <th>Descripción</th>
+                                            <th>Marca / Modelo</th>
+                                            <th>Serie / Lente</th>
+                                            <th>Estatus</th>
+                                            <th>Desinc.</th>
+                                            <th>Fecha / Oficio</th>
+                                            <th class="text-end">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminStockTableBody"></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div id="adminGroupedComponentsContainer"></div>
-            </div>
-
-            <!-- TAB 2: STOCK / BODEGA Y DESINCORPORACIÓN -->
-            <div id="admSectionStock" class="d-none">
-                <div class="row g-3 mb-3">
-                    <div class="col-6 col-md-3">
-                        <div class="card stat-card bg-white p-3">
-                            <div class="text-muted small fw-semibold">Total en Stock / Baja</div>
-                            <div id="stockStatTotal" class="fs-3 fw-bold text-dark">0</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="card stat-card bg-white p-3">
-                            <div class="text-muted small fw-semibold">Disponibles (Stock)</div>
-                            <div id="stockStatDisponibles" class="fs-3 fw-bold text-info">0</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="card stat-card bg-white p-3">
-                            <div class="text-muted small fw-semibold">En Falla</div>
-                            <div id="stockStatFalla" class="fs-3 fw-bold text-danger">0</div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="card stat-card bg-white p-3">
-                            <div class="text-muted small fw-semibold">Para Desincorporación</div>
-                            <div id="stockStatDesinc" class="fs-3 fw-bold text-warning">0</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card border-0 shadow-sm rounded-3">
-                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h6 class="fw-bold mb-0"><i class="bi bi-box-seam-fill me-2 text-pink"></i>Control de Stock, Resguardo y Desincorporación</h6>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button class="btn btn-pink btn-sm fw-semibold" onclick="openStockModal()">
-                                <i class="bi bi-plus-circle me-1"></i>Agregar a Stock
-                            </button>
-                            <button class="btn btn-success btn-sm fw-semibold" onclick="exportStockExcel()">
-                                <i class="bi bi-file-earmark-excel me-1"></i>Exportar Stock
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body border-bottom bg-light py-2">
-                        <div class="row g-2">
-                            <div class="col-md-3">
-                                <select id="stockFilterEstatus" class="form-select form-select-sm" onchange="renderAdminStockTable()">
-                                    <option value="ALL">Todos los Estatus</option>
-                                    <option value="Stock">Stock</option>
-                                    <option value="Falla">Falla</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <select id="stockFilterDesinc" class="form-select form-select-sm" onchange="renderAdminStockTable()">
-                                    <option value="ALL">Desincorporación: Todos</option>
-                                    <option value="Si">Sí (Para baja)</option>
-                                    <option value="No">No</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <input type="text" id="stockSearchInput" class="form-control form-control-sm" placeholder="Ej. 1120405, Brother, Canon, 747048984, 050351, oficio, destino..." oninput="renderAdminStockTable()">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Origen</th>
-                                        <th>Destino</th>
-                                        <th>Inv. INE</th>
-                                        <th>Descripción</th>
-                                        <th>Marca y Modelo</th>
-                                        <th>Serie / Lente</th>
-                                        <th>Estatus</th>
-                                        <th>Desincorporación</th>
-                                        <th>Fecha / Oficio Baja</th>
-                                        <th class="text-end">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="adminStockTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 3: TRASPASOS Y REASIGNACIÓN -->
-            <div id="admSectionTraspasos" class="d-none">
-                <div class="row g-4">
-                    <div class="col-lg-5">
-                        <div class="card border-0 shadow-sm rounded-3">
-                            <div class="card-header bg-white py-3">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-arrow-left-right text-danger me-2"></i>Reasignar o Traspasar Equipo</h6>
-                            </div>
-                            <div class="card-body">
-                                <form id="transferForm" onsubmit="submitDirectTransfer(event)">
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">1. Filtrar Origen por Módulo</label>
-                                        <select id="trSourceModulo" class="form-select" onchange="onTransferSourceChange()">
-                                            <option value="ALL">Todos los Módulos</option>
-                                            <option value="050351">Módulo 050351</option>
-                                            <option value="050353">Módulo 050353</option>
-                                            <option value="050354">Módulo 050354</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">2. Componente Asignado a Traspasar *</label>
-                                        <select id="trComponentSelect" class="form-select" onchange="onTransferComponentSelected()" required></select>
-                                        <small id="trCurrentAssignmentHint" class="text-muted d-block mt-1"></small>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">3. Tipo de Movimiento *</label>
-                                        <select id="trActionType" class="form-select" onchange="onTransferActionChange()" required>
-                                            <option value="station">Reasignar a Usuario / Estación (Mismo o distinto MAC)</option>
-                                            <option value="stock">Enviar a Stock / Resguardo / Desincorporación</option>
-                                        </select>
-                                    </div>
-
-                                    <div id="trStationTargetBox" class="p-3 rounded-3 bg-light border mb-3">
-                                        <div class="mb-2">
-                                            <label class="form-label fw-semibold small mb-1">Módulo Destino *</label>
-                                            <select id="trTargetModulo" class="form-select form-select-sm" onchange="onTransferTargetModuloChange()">
-                                                <option value="050351">Módulo 050351</option>
-                                                <option value="050353">Módulo 050353</option>
-                                                <option value="050354">Módulo 050354</option>
+                <!-- SECCIÓN 3: TRASPASOS -->
+                <div id="admSectionTraspasos" class="d-none">
+                    <div class="row g-4">
+                        <div class="col-lg-5">
+                            <div class="card border-0 shadow-sm rounded-3">
+                                <div class="card-header bg-dark text-white fw-semibold">
+                                    <i class="bi bi-arrow-left-right me-2"></i>Registrar Traspaso o Envío a Stock
+                                </div>
+                                <div class="card-body">
+                                    <form id="transferForm" onsubmit="submitDirectTransfer(event)">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Filtrar Módulo Origen</label>
+                                            <select id="trSourceModulo" class="form-select" onchange="onTransferSourceChange()">
+                                                <option value="ALL">Todos los Módulos</option>
+                                                <option value="050351">050351</option>
+                                                <option value="050353">050353</option>
+                                                <option value="050354">050354</option>
                                             </select>
                                         </div>
-                                        <div>
-                                            <label class="form-label fw-semibold small mb-1">Estación / Usuario Destino *</label>
-                                            <select id="trTargetEstacion" class="form-select form-select-sm" onchange="updateTransferTargetHint()"></select>
-                                            <small id="trTargetOperatorHint" class="fw-semibold d-block mt-1"></small>
-                                        </div>
-                                    </div>
 
-                                    <div id="trStockTargetBox" class="p-3 rounded-3 bg-light border mb-3 d-none">
-                                        <div class="row g-2">
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold small mb-1">Destino *</label>
-                                                <input type="text" id="trStockDestino" class="form-control form-control-sm" value="Stock / Resguardo" placeholder="Ej. Bodega / MAC 050353">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold small mb-1">Estatus *</label>
-                                                <select id="trStockEstatus" class="form-select form-select-sm" onchange="onTrStockStatusChange()">
-                                                    <option value="Stock">Stock</option>
-                                                    <option value="Falla">Falla</option>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Componente Asignado</label>
+                                            <select id="trComponentSelect" class="form-select" onchange="onTransferComponentSelected()" required></select>
+                                            <small id="trCurrentAssignmentHint" class="text-muted d-block mt-1"></small>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Tipo de Movimiento</label>
+                                            <select id="trActionType" class="form-select" onchange="onTransferActionChange()">
+                                                <option value="station">Reasignar a Otra Estación / Módulo</option>
+                                                <option value="stock">Enviar a Stock / Resguardo</option>
+                                            </select>
+                                        </div>
+
+                                        <div id="trStationTargetBox" class="p-3 bg-light rounded border mb-3">
+                                            <div class="mb-2">
+                                                <label class="form-label fw-semibold">Módulo Destino</label>
+                                                <select id="trTargetModulo" class="form-select" onchange="onTransferTargetModuloChange()">
+                                                    <option value="050351">050351</option>
+                                                    <option value="050353">050353</option>
+                                                    <option value="050354">050354</option>
                                                 </select>
                                             </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold small mb-1">Desincorporación</label>
-                                                <select id="trStockDesinc" class="form-select form-select-sm">
-                                                    <option value="No">No</option>
-                                                    <option value="Si">Si</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold small mb-1">Fecha Desinc.</label>
-                                                <input type="date" id="trStockFecha" class="form-control form-control-sm">
-                                            </div>
-                                            <div class="col-12">
-                                                <label class="form-label fw-semibold small mb-1">Oficio de Desincorporación / Traspaso</label>
-                                                <input type="text" id="trStockOficio" class="form-control form-control-sm text-uppercase" placeholder="Ej. INE/JDE03/VRFE/0045/2026">
+                                            <div>
+                                                <label class="form-label fw-semibold">Estación Destino</label>
+                                                <select id="trTargetEstacion" class="form-select" onchange="updateTransferTargetHint()"></select>
+                                                <small id="trTargetOperatorHint" class="d-block mt-1"></small>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Motivo / Observaciones del Traspaso *</label>
-                                        <input type="text" id="trMotivo" class="form-control" required placeholder="Ej. Reasignación por apoyo operativo / Equipo ya no se utiliza">
-                                    </div>
+                                        <div id="trStockTargetBox" class="p-3 bg-light rounded border mb-3 d-none">
+                                            <div class="mb-2">
+                                                <label class="form-label fw-semibold">Destino / Bodega</label>
+                                                <input type="text" id="trStockDestino" class="form-control" value="Stock / Resguardo">
+                                            </div>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-6">
+                                                    <label class="form-label fw-semibold">Estatus</label>
+                                                    <select id="trStockEstatus" class="form-select" onchange="onTrStockStatusChange()">
+                                                        <option value="Stock">Stock</option>
+                                                        <option value="Falla">Falla</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label fw-semibold">Desincorporación</label>
+                                                    <select id="trStockDesinc" class="form-select">
+                                                        <option value="No">No</option>
+                                                        <option value="Si">Sí</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-6">
+                                                    <label class="form-label fw-semibold">Fecha Desinc.</label>
+                                                    <input type="date" id="trStockFecha" class="form-control">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label fw-semibold">Oficio</label>
+                                                    <input type="text" id="trStockOficio" class="form-control" placeholder="Ej. INE/JDE03/...">
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                    <button type="submit" class="btn btn-pink w-100 fw-semibold">
-                                        <i class="bi bi-send-check me-1"></i>Ejecutar Traspaso y Generar Formato
-                                    </button>
-                                </form>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Motivo / Observaciones</label>
+                                            <textarea id="trMotivo" class="form-control" rows="2" placeholder="Motivo del movimiento"></textarea>
+                                        </div>
+
+                                        <button type="submit" class="btn btn-dark w-100 fw-semibold">
+                                            <i class="bi bi-check2-circle me-1"></i>Aplicar y Generar Formato
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="col-lg-7">
-                        <div class="card border-0 shadow-sm rounded-3">
-                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Historial de Traspasos y Envíos a Stock</h6>
-                                <span id="transferHistoryCount" class="badge bg-secondary">0</span>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
+                        <div class="col-lg-7">
+                            <div class="card border-0 shadow-sm rounded-3">
+                                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+                                    <span><i class="bi bi-clock-history me-2"></i>Historial de Traspasos</span>
+                                    <span id="transferHistoryCount" class="badge bg-primary">0</span>
+                                </div>
+                                <div class="card-body table-responsive">
                                     <table class="table table-hover align-middle mb-0">
                                         <thead class="table-light">
                                             <tr>
                                                 <th>Folio / Fecha</th>
-                                                <th>Equipo / Serie</th>
-                                                <th>De (Origen)</th>
-                                                <th>A (Destino)</th>
+                                                <th>Equipo</th>
+                                                <th>Origen</th>
+                                                <th>Destino</th>
                                                 <th class="text-end">Formato</th>
                                             </tr>
                                         </thead>
@@ -663,194 +666,120 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- TAB 4: OPERADORES Y RESPONSABLES -->
-            <div id="admSectionOperadores" class="d-none">
-                <div class="row g-4">
-                    <div class="col-lg-4">
-                        <div class="card border-0 shadow-sm rounded-3">
-                            <div class="card-header bg-white py-3">
-                                <h6 id="opFormTitle" class="fw-bold mb-0"><i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable</h6>
+                <!-- SECCIÓN 4: OPERADORES -->
+                <div id="admSectionOperadores" class="d-none">
+                    <div class="row g-4">
+                        <div class="col-lg-4">
+                            <div class="card border-0 shadow-sm rounded-3">
+                                <div class="card-body">
+                                    <h6 id="opFormTitle" class="fw-bold mb-3">
+                                        <i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable
+                                    </h6>
+                                    <form id="operatorForm" onsubmit="saveOperator(event)">
+                                        <input type="hidden" id="editOpId">
+
+                                        <div class="mb-2">
+                                            <label class="form-label fw-semibold">Módulo</label>
+                                            <select id="opRegModulo" class="form-select" onchange="onOpRegModuloChange()">
+                                                <option value="050351">050351</option>
+                                                <option value="050353">050353</option>
+                                                <option value="050354">050354</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label class="form-label fw-semibold">Estación</label>
+                                            <select id="opRegEstacion" class="form-select" onchange="updateOpRoleHint()"></select>
+                                            <small id="opRoleHint" class="d-block mt-1"></small>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label class="form-label fw-semibold">Nombre Completo</label>
+                                            <input type="text" id="opRegNombre" class="form-control" required>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label class="form-label fw-semibold">Teléfono</label>
+                                            <input type="text" id="opRegTelefono" class="form-control" required>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Correo Institucional</label>
+                                            <input type="email" id="opRegCorreo" class="form-control" required>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">Fotografía (opcional)</label>
+                                            <input type="file" id="opFotoInput" accept="image/*" class="form-control form-control-sm" onchange="previewImageFile(event, 'opPhotoPreview', 'opPhotoImg', 'currentOpPhoto')">
+                                            <div id="opPhotoPreview" class="d-none mt-2">
+                                                <img id="opPhotoImg" src="" class="avatar-preview">
+                                                <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="clearImageField('opFotoInput', 'opPhotoPreview', 'currentOpPhoto')">Quitar</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex gap-2">
+                                            <button type="submit" class="btn btn-danger flex-grow-1 fw-semibold">Guardar</button>
+                                            <button type="button" id="btnCancelEditOp" class="btn btn-outline-secondary d-none" onclick="resetOperatorForm()">Cancelar</button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <form id="operatorForm" onsubmit="saveOperator(event)">
-                                    <input type="hidden" id="editOpId">
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Módulo MAC *</label>
-                                        <select id="opRegModulo" class="form-select" onchange="onOpRegModuloChange()" required>
-                                            <option value="050351">Módulo 050351</option>
-                                            <option value="050353">Módulo 050353</option>
-                                            <option value="050354">Módulo 050354</option>
+                        </div>
+
+                        <div class="col-lg-8">
+                            <div class="card border-0 shadow-sm rounded-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                                        <h6 class="fw-bold mb-0">Directorio de Operadores y Responsables</h6>
+                                        <select id="filterOpModulo" class="form-select w-auto" onchange="renderOperatorsTable()">
+                                            <option value="ALL">Todos los Módulos</option>
+                                            <option value="050351">050351</option>
+                                            <option value="050353">050353</option>
+                                            <option value="050354">050354</option>
                                         </select>
                                     </div>
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Estación / Rol *</label>
-                                        <select id="opRegEstacion" class="form-select" onchange="updateOpRoleHint()" required></select>
-                                        <small id="opRoleHint" class="text-primary fw-semibold"></small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Nombre Completo *</label>
-                                        <input type="text" id="opRegNombre" class="form-control" required placeholder="Ej. Juan Pérez López">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Teléfono *</label>
-                                        <input type="tel" id="opRegTelefono" class="form-control" required placeholder="Ej. 8661234567">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Correo Institucional *</label>
-                                        <input type="email" id="opRegCorreo" class="form-control" required placeholder="usuario@ine.mx">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label fw-semibold">Fotografía del Usuario</label>
-                                        <input type="file" id="opFotoInput" class="form-control form-control-sm" accept="image/*" onchange="previewImageFile(event, 'opPhotoPreview', 'opPhotoImg', 'currentOpPhoto')">
-                                        <div id="opPhotoPreview" class="mt-2 d-none d-flex align-items-center gap-2">
-                                            <img id="opPhotoImg" src="" class="avatar-table">
-                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearImageField('opFotoInput', 'opPhotoPreview', 'currentOpPhoto')">Quitar</button>
-                                        </div>
-                                    </div>
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-pink flex-fill fw-semibold">
-                                            <i class="bi bi-check-circle me-1"></i>Guardar
-                                        </button>
-                                        <button type="button" id="btnCancelEditOp" class="btn btn-outline-secondary d-none" onclick="resetOperatorForm()">Cancelar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="col-lg-8">
-                        <div class="card border-0 shadow-sm rounded-3">
-                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-people-fill me-2 text-primary"></i>Directorio de Operadores y Responsables</h6>
-                                <select id="filterOpModulo" class="form-select form-select-sm w-auto" onchange="renderOperatorsTable()">
-                                    <option value="ALL">Todos los Módulos</option>
-                                    <option value="050351">Módulo 050351</option>
-                                    <option value="050353">Módulo 050353</option>
-                                    <option value="050354">Módulo 050354</option>
-                                </select>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Foto</th>
-                                                <th>Módulo / Est.</th>
-                                                <th>Nombre</th>
-                                                <th>Teléfono</th>
-                                                <th>Correo</th>
-                                                <th class="text-end">Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="operatorsTableBody"></tbody>
-                                    </table>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Foto</th>
+                                                    <th>Módulo / Est.</th>
+                                                    <th>Nombre</th>
+                                                    <th>Teléfono</th>
+                                                    <th>Correo</th>
+                                                    <th class="text-end">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="operatorsTableBody"></tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- TAB 5: ESTACIONES Y CATÁLOGOS -->
-            <div id="admSectionConfig" class="d-none">
-                <div class="row g-4">
-                    <div class="col-lg-6">
-                        <div class="card border-0 shadow-sm rounded-3 mb-4">
-                            <div class="card-header bg-white py-3">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-diagram-3-fill me-2 text-success"></i>Estaciones Operativas por Módulo (Adicionales a Estación 0)</h6>
-                            </div>
-                            <div class="card-body">
-                                <p class="text-muted small">La <strong>Estación 0 (Servidor / Responsable de Módulo)</strong> siempre está habilitada. Indica cuántas estaciones de trabajo (1..N) tiene cada módulo:</p>
-                                <div class="row g-3 mb-3">
-                                    <div class="col-4">
-                                        <label class="form-label fw-semibold">Módulo 050351</label>
-                                        <input type="number" id="cfg-050351" class="form-control" min="0" max="30">
-                                    </div>
-                                    <div class="col-4">
-                                        <label class="form-label fw-semibold">Módulo 050353</label>
-                                        <input type="number" id="cfg-050353" class="form-control" min="0" max="30">
-                                    </div>
-                                    <div class="col-4">
-                                        <label class="form-label fw-semibold">Módulo 050354</label>
-                                        <input type="number" id="cfg-050354" class="form-control" min="0" max="30">
-                                    </div>
-                                </div>
-                                <button class="btn btn-success fw-semibold" onclick="saveStationCounts()">
-                                    <i class="bi bi-save me-1"></i>Guardar Estaciones
-                                </button>
-                            </div>
+                <!-- SECCIÓN 5: TICKETS DE FALLAS -->
+                <div id="admSectionFallas" class="d-none">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h6 class="fw-bold mb-0"><i class="bi bi-ticket-perforated text-danger me-2"></i>Tickets y Reportes de Falla</h6>
+                            <button class="btn btn-success btn-sm fw-semibold" onclick="exportFaultsExcel()">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Exportar Tickets Excel
+                            </button>
                         </div>
-
-                        <div class="card border-0 shadow-sm rounded-3">
-                            <div class="card-header bg-white py-3">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Carga Rápida de Tablas Oficiales MAC</h6>
-                            </div>
-                            <div class="card-body d-flex flex-column gap-2">
-                                <button class="btn btn-outline-dark text-start fw-semibold" onclick="replaceMac050351WithNewTable()">
-                                    <i class="bi bi-arrow-repeat me-2 text-danger"></i>Cargar / Reemplazar Tabla MAC 050351 (Estaciones 0 a 7)
-                                </button>
-                                <button class="btn btn-outline-dark text-start fw-semibold" onclick="replaceMac050353WithNewTable()">
-                                    <i class="bi bi-arrow-repeat me-2 text-primary"></i>Cargar / Reemplazar Tabla MAC 050353 (Estaciones 0 a 3)
-                                </button>
-                                <button class="btn btn-outline-dark text-start fw-semibold" onclick="replaceMac050354WithNewTable()">
-                                    <i class="bi bi-arrow-repeat me-2 text-success"></i>Cargar / Reemplazar Tabla MAC 050354 (Estaciones 0 a 2)
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-lg-6">
-                        <div class="card border-0 shadow-sm rounded-3 mb-4">
-                            <div class="card-header bg-white py-3">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-tags-fill me-2 text-pink"></i>Catálogo de Marcas</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="input-group mb-3">
-                                    <input type="text" id="newBrandInput" class="form-control" placeholder="Nueva marca (Ej. Honeywell)">
-                                    <button class="btn btn-pink fw-semibold" onclick="addCatalogItem('marcas', 'newBrandInput')">Agregar</button>
-                                </div>
-                                <div id="brandsListContainer" class="d-flex flex-wrap gap-2"></div>
-                            </div>
-                        </div>
-
-                        <div class="card border-0 shadow-sm rounded-3">
-                            <div class="card-header bg-white py-3">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-cpu-fill me-2 text-dark"></i>Catálogo de Tipos de Componente</h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="input-group mb-3">
-                                    <input type="text" id="newTypeInput" class="form-control" placeholder="Nuevo componente (Ej. Regulador de Voltaje)">
-                                    <button class="btn btn-dark fw-semibold" onclick="addCatalogItem('tipos_componente', 'newTypeInput')">Agregar</button>
-                                </div>
-                                <div id="typesListContainer" class="d-flex flex-wrap gap-2"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 6: TICKETS DE FALLA Y SERVICIO -->
-            <div id="admSectionFallas" class="d-none">
-                <div class="card border-0 shadow-sm rounded-3">
-                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h6 class="fw-bold mb-0"><i class="bi bi-ticket-perforated-fill me-2 text-danger"></i>Control de Tickets y Reportes de Falla</h6>
-                        <button class="btn btn-success btn-sm fw-semibold" onclick="exportFaultsExcel()">
-                            <i class="bi bi-file-earmark-excel me-1"></i>Exportar Tickets Excel
-                        </button>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
+                        <div class="card-body table-responsive">
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Folio / Fecha</th>
                                         <th>Módulo / Est.</th>
                                         <th>Usuario</th>
-                                        <th>Componente / Serie</th>
-                                        <th>Falla Reportada</th>
-                                        <th>Estado</th>
+                                        <th>Equipo</th>
+                                        <th>Falla</th>
+                                        <th>Estatus</th>
                                         <th class="text-end">Acciones</th>
                                     </tr>
                                 </thead>
@@ -859,469 +788,506 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- ==================== MODAL COMPONENTE (REGISTRAR / EDITAR) ==================== -->
-<div class="modal fade" id="componentModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white">
-                <h5 id="compModalTitle" class="modal-title fw-bold"><i class="bi bi-plus-circle-fill text-danger me-2"></i>Registrar Componente</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="componentForm" onsubmit="saveComponentFromModal(event)">
-                <div class="modal-body">
-                    <input type="hidden" id="editCompId">
-                    <input type="hidden" id="compFormContext" value="admin">
-
-                    <div id="compAdminLocationRow" class="row g-3 mb-3 p-3 bg-light rounded-3 border">
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Módulo MAC *</label>
-                            <select id="compModulo" class="form-select" onchange="onAdminCompModuloChange()" required>
-                                <option value="050351">Módulo 050351</option>
-                                <option value="050353">Módulo 050353</option>
-                                <option value="050354">Módulo 050354</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Estación *</label>
-                            <select id="compEstacion" class="form-select" onchange="onAdminStationOrBrandChange()" required></select>
-                        </div>
-                        <div class="col-md-4 d-flex flex-column justify-content-center">
-                            <span class="small text-muted fw-semibold">Responsable / Operador:</span>
-                            <small id="compOperatorHint" class="fw-semibold"></small>
-                        </div>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Tipo de Componente *</label>
-                            <select id="compTipo" class="form-select" onchange="onModalBrandOrTypeChange()" required></select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Marca *</label>
-                            <select id="compMarca" class="form-select" onchange="onModalBrandOrTypeChange()" required></select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Modelo *</label>
-                            <input type="text" id="compModelo" class="form-control" required placeholder="Ej. ThinkVision / HL-L6400DW">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Número de Serie *</label>
-                            <div class="input-group">
-                                <input type="text" id="compSerie" class="form-control text-uppercase" required placeholder="Escanea o escribe la serie">
-                                <button type="button" id="btnCompScanSerie" class="btn btn-outline-dark" onclick="openScanner('compSerie')" title="Escanear código">
-                                    <i class="bi bi-upc-scan"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Inventario INE</label>
-                            <input type="text" id="compInventarioIne" class="form-control text-uppercase" placeholder="Ej. 22-MZ006XB6 / C-2023-0127">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Estado Físico *</label>
-                            <select id="compEstado" class="form-select" required>
-                                <option value="Operativo">Operativo</option>
-                                <option value="Stock">Stock</option>
-                                <option value="En Falla">En Falla</option>
-                                <option value="En Revision">En Revisión</option>
-                                <option value="Baja">Baja</option>
-                                <option value="No Aplica">No Aplica</option>
-                            </select>
-                        </div>
-
-                        <!-- Vinculación Monitor <-> CPU -->
-                        <div id="compCpuLinkContainer" class="col-12 d-none">
-                            <div class="p-3 rounded-3 bg-light border">
-                                <label class="form-label fw-semibold text-primary mb-1">
-                                    <i class="bi bi-link-45deg me-1"></i>CPU / Equipo Vinculado al Monitor
-                                </label>
-                                <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <select id="compCpuSelect" class="form-select form-select-sm" onchange="onCompCpuSelectChange()">
-                                            <option value="">-- Seleccionar CPU registrado --</option>
-                                        </select>
+                <!-- SECCIÓN 6: ESTACIONES Y CATÁLOGOS -->
+                <div id="admSectionConfig" class="d-none">
+                    <div class="row g-4">
+                        <div class="col-lg-5">
+                            <div class="card border-0 shadow-sm rounded-3">
+                                <div class="card-body">
+                                    <h6 class="fw-bold mb-3"><i class="bi bi-sliders me-2"></i>Estaciones Operativas por Módulo (además de Estación 0)</h6>
+                                    <div class="mb-2">
+                                        <label class="form-label">Módulo 050351</label>
+                                        <input type="number" id="cfg-050351" min="0" class="form-control">
                                     </div>
-                                    <div class="col-md-6">
-                                        <input type="text" id="compSerieCpuVinculada" class="form-control form-control-sm text-uppercase" placeholder="O escribe la serie del CPU vinculado">
+                                    <div class="mb-2">
+                                        <label class="form-label">Módulo 050353</label>
+                                        <input type="number" id="cfg-050353" min="0" class="form-control">
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Módulo 050354</label>
+                                        <input type="number" id="cfg-050354" min="0" class="form-control">
+                                    </div>
+                                    <button class="btn btn-dark w-100 fw-semibold" onclick="saveStationCounts()">
+                                        Guardar Estaciones
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Serie de Lente para Cámara -->
-                        <div id="compLensLinkContainer" class="col-md-6 d-none">
-                            <label class="form-label fw-semibold text-secondary">
-                                <i class="bi bi-camera-reels me-1"></i>Serie del Lente
-                            </label>
-                            <input type="text" id="compSerieLente" class="form-control text-uppercase" placeholder="Ej. 7797051400">
-                        </div>
+                        <div class="col-lg-7">
+                            <div class="card border-0 shadow-sm rounded-3 mb-3">
+                                <div class="card-body">
+                                    <h6 class="fw-bold mb-2">Catálogo de Marcas</h6>
+                                    <div class="input-group mb-3">
+                                        <input type="text" id="newBrandInput" class="form-control" placeholder="Nueva marca">
+                                        <button class="btn btn-danger" onclick="addCatalogItem('marcas', 'newBrandInput')">Agregar</button>
+                                    </div>
+                                    <div id="brandsListContainer" class="d-flex gap-2 flex-wrap"></div>
+                                </div>
+                            </div>
 
-                        <!-- Serie de Docking para Laptop -->
-                        <div id="compDockingLinkContainer" class="col-md-6 d-none">
-                            <label class="form-label fw-semibold text-secondary">
-                                <i class="bi bi-usb-plug me-1"></i>Serie del Docking
-                            </label>
-                            <input type="text" id="compSerieDocking" class="form-control text-uppercase" placeholder="Ej. ZVQ1GKN6">
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Observaciones</label>
-                            <input type="text" id="compNotas" class="form-control" placeholder="Notas adicionales del componente">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Fotografía del Equipo / Etiqueta</label>
-                            <input type="file" id="compFotoInput" class="form-control form-control-sm" accept="image/*" onchange="previewImageFile(event, 'compPhotoPreview', 'compPhotoImg', 'currentCompPhoto')">
-                            <div id="compPhotoPreview" class="mt-2 d-none d-flex align-items-center gap-2">
-                                <img id="compPhotoImg" src="" class="img-thumb">
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearImageField('compFotoInput', 'compPhotoPreview', 'currentCompPhoto')">Quitar foto</button>
+                            <div class="card border-0 shadow-sm rounded-3">
+                                <div class="card-body">
+                                    <h6 class="fw-bold mb-2">Catálogo de Tipos de Componente</h6>
+                                    <div class="input-group mb-3">
+                                        <input type="text" id="newTypeInput" class="form-control" placeholder="Nuevo tipo de componente">
+                                        <button class="btn btn-danger" onclick="addCatalogItem('tipos_componente', 'newTypeInput')">Agregar</button>
+                                    </div>
+                                    <div id="typesListContainer" class="d-flex gap-2 flex-wrap"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-pink fw-semibold">
-                        <i class="bi bi-check-circle me-1"></i>Guardar Componente
-                    </button>
-                </div>
-            </form>
+
+            </div>
         </div>
     </div>
-</div>
 
-<!-- ==================== MODAL STOCK / BODEGA Y DESINCORPORACIÓN ==================== -->
-<div class="modal fade" id="stockModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white">
-                <h5 id="stockModalTitle" class="modal-title fw-bold"><i class="bi bi-box-seam-fill text-danger me-2"></i>Registrar Equipo en Stock / Baja</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="stockForm" onsubmit="saveStockFromModal(event)">
-                <div class="modal-body">
-                    <input type="hidden" id="editStockId">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Origen *</label>
-                            <input type="text" id="stockOrigen" class="form-control" value="050351" required placeholder="Ej. 050351 / 050353">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Destino (A dónde se enviará)</label>
-                            <input type="text" id="stockDestino" class="form-control" placeholder="Ej. Bodega Central / MAC 050353 / Almacén">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Inventario INE</label>
-                            <input type="text" id="stockInventarioIne" class="form-control text-uppercase" placeholder="Ej. 1120405 / 698583">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Descripción *</label>
-                            <input type="text" id="stockDescripcion" class="form-control" required placeholder="Ej. Impresora laser / Camara digital">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Marca *</label>
-                            <input type="text" id="stockMarca" class="form-control" required placeholder="Ej. Brother / CANON">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Modelo *</label>
-                            <input type="text" id="stockModelo" class="form-control" required placeholder="Ej. HL-L6200DW">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Serie *</label>
-                            <div class="input-group">
-                                <input type="text" id="stockSerie" class="form-control text-uppercase" required placeholder="Número de serie del equipo">
-                                <button type="button" class="btn btn-outline-dark" onclick="openScanner('stockSerie')" title="Escanear serie">
-                                    <i class="bi bi-upc-scan"></i>
-                                </button>
+    <!-- ==================== MODALES ==================== -->
+
+    <!-- Modal Registrar / Editar Componente -->
+    <div class="modal fade" id="componentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="compModalTitle">Registrar Componente en Estación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="componentForm" onsubmit="saveComponentFromModal(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="editCompId">
+                        <input type="hidden" id="compFormContext" value="admin">
+
+                        <div id="compAdminLocationRow" class="row g-2 mb-3 p-3 bg-light rounded border">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Módulo</label>
+                                <select id="compModulo" class="form-select" onchange="onAdminCompModuloChange()">
+                                    <option value="050351">050351</option>
+                                    <option value="050353">050353</option>
+                                    <option value="050354">050354</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Estación</label>
+                                <select id="compEstacion" class="form-select" onchange="onAdminStationOrBrandChange()"></select>
+                            </div>
+                            <div class="col-12">
+                                <small id="compOperatorHint"></small>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Lente (si aplica)</label>
-                            <input type="text" id="stockLente" class="form-control text-uppercase" placeholder="Ej. 747048984">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Estatus *</label>
-                            <select id="stockEstatus" class="form-select" onchange="onStockStatusChange()" required>
-                                <option value="Stock">Stock</option>
-                                <option value="Falla">Falla</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Desincorporación *</label>
-                            <select id="stockDesincorporacion" class="form-select" onchange="onStockDesincChange()" required>
-                                <option value="No">No</option>
-                                <option value="Si">Si</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Fecha de Desincorporación</label>
-                            <input type="date" id="stockFechaDesinc" class="form-control">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Oficio de Desincorporación</label>
-                            <input type="text" id="stockOficioDesinc" class="form-control text-uppercase" placeholder="Ej. INE/JDE03/VRFE/0123/2026">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Observaciones</label>
-                            <input type="text" id="stockObservaciones" class="form-control" placeholder="Notas de resguardo, dictamen o envío">
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Tipo de Componente</label>
+                                <select id="compTipo" class="form-select" onchange="onModalBrandOrTypeChange()" required></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Marca</label>
+                                <select id="compMarca" class="form-select" onchange="onModalBrandOrTypeChange()" required></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Modelo</label>
+                                <input type="text" id="compModelo" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Número de Serie</label>
+                                <div class="input-group">
+                                    <input type="text" id="compSerie" class="form-control text-uppercase" required>
+                                    <button type="button" id="btnCompScanSerie" class="btn btn-outline-dark" onclick="openScanner('compSerie')" title="Escanear serie">
+                                        <i class="bi bi-qr-code-scan"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Inventario INE</label>
+                                <input type="text" id="compInventarioIne" class="form-control text-uppercase">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Estado Físico</label>
+                                <select id="compEstado" class="form-select">
+                                    <option value="Operativo">Operativo</option>
+                                    <option value="En Revision">En Revisión</option>
+                                    <option value="En Falla">En Falla</option>
+                                    <option value="Stock">Stock</option>
+                                    <option value="Baja">Baja</option>
+                                    <option value="No Aplica">No Aplica</option>
+                                </select>
+                            </div>
+
+                            <!-- Vinculación CPU para Monitor -->
+                            <div id="compCpuLinkContainer" class="col-12 d-none p-3 bg-light rounded border">
+                                <label class="form-label fw-semibold text-primary">Serie de CPU Vinculada (Monitor)</label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <select id="compCpuSelect" class="form-select" onchange="onCompCpuSelectChange()"></select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="text" id="compSerieCpuVinculada" class="form-control text-uppercase" placeholder="Serie manual del CPU">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Serie de Lente para Cámara -->
+                            <div id="compLensLinkContainer" class="col-md-6 d-none">
+                                <label class="form-label fw-semibold">Serie de Lente (Cámara)</label>
+                                <input type="text" id="compSerieLente" class="form-control text-uppercase">
+                            </div>
+
+                            <!-- Serie de Docking para Laptop -->
+                            <div id="compDockingLinkContainer" class="col-md-6 d-none">
+                                <label class="form-label fw-semibold">Serie de Base / Docking (Laptop)</label>
+                                <input type="text" id="compSerieDocking" class="form-control text-uppercase">
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Observaciones</label>
+                                <textarea id="compNotas" class="form-control" rows="2"></textarea>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Fotografía (opcional)</label>
+                                <input type="file" id="compFotoInput" accept="image/*" class="form-control form-control-sm" onchange="previewImageFile(event, 'compPhotoPreview', 'compPhotoImg', 'currentCompPhoto')">
+                                <div id="compPhotoPreview" class="d-none mt-2">
+                                    <img id="compPhotoImg" src="" class="img-thumb">
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="clearImageField('compFotoInput', 'compPhotoPreview', 'currentCompPhoto')">Quitar</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-pink fw-semibold">
-                        <i class="bi bi-check-circle me-1"></i>Guardar en Stock
-                    </button>
-                </div>
-            </form>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger fw-semibold">Guardar Componente</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- ==================== MODAL ENVIAR A STOCK DESDE ASIGNACIÓN ==================== -->
-<div class="modal fade" id="moveToStockModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-box-arrow-in-down text-warning me-2"></i>Enviar Equipo Asignado a Stock / Resguardo</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="moveToStockForm" onsubmit="confirmMoveComponentToStock(event)">
-                <div class="modal-body">
-                    <input type="hidden" id="mtsCompId">
-                    <div class="p-3 rounded-3 bg-light border mb-3">
-                        <div><strong>Equipo:</strong> <span id="mtsCompSummary"></span></div>
-                        <div class="small text-muted mt-1"><strong>Origen actual:</strong> <span id="mtsOriginSummary"></span></div>
+    <!-- Modal Agregar / Editar Stock -->
+    <div class="modal fade" id="stockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="stockModalTitle">Registrar Equipo en Stock / Baja</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="stockForm" onsubmit="saveStockFromModal(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="editStockId">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Origen</label>
+                                <select id="stockOrigen" class="form-select">
+                                    <option value="050351">050351</option>
+                                    <option value="050353">050353</option>
+                                    <option value="050354">050354</option>
+                                    <option value="JDE03">03 Junta Distrital</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Destino</label>
+                                <input type="text" id="stockDestino" class="form-control" placeholder="Ej. Resguardo / Baja">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Inventario INE</label>
+                                <input type="text" id="stockInventarioIne" class="form-control text-uppercase">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Descripción / Componente</label>
+                                <input type="text" id="stockDescripcion" class="form-control" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Marca</label>
+                                <input type="text" id="stockMarca" class="form-control" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Modelo</label>
+                                <input type="text" id="stockModelo" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Número de Serie</label>
+                                <div class="input-group">
+                                    <input type="text" id="stockSerie" class="form-control text-uppercase" required>
+                                    <button type="button" class="btn btn-outline-dark" onclick="openScanner('stockSerie')">
+                                        <i class="bi bi-qr-code-scan"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Serie de Lente (opcional)</label>
+                                <input type="text" id="stockLente" class="form-control text-uppercase">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Estatus</label>
+                                <select id="stockEstatus" class="form-select" onchange="onStockStatusChange()">
+                                    <option value="Stock">Stock</option>
+                                    <option value="Falla">Falla</option>
+                                    <option value="Desincorporado">Desincorporado</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Desincorporación</label>
+                                <select id="stockDesincorporacion" class="form-select" onchange="onStockDesincChange()">
+                                    <option value="No">No</option>
+                                    <option value="Si">Sí</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Fecha Desincorporación</label>
+                                <input type="date" id="stockFechaDesinc" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Oficio de Desincorporación</label>
+                                <input type="text" id="stockOficioDesinc" class="form-control text-uppercase">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Observaciones</label>
+                                <input type="text" id="stockObservaciones" class="form-control">
+                            </div>
+                        </div>
                     </div>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Destino (A dónde se enviará) *</label>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger fw-semibold">Guardar en Stock</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Enviar Componente Asignado a Stock -->
+    <div class="modal fade" id="moveToStockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-box-arrow-in-down me-2"></i>Enviar Equipo a Stock / Resguardo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="moveToStockForm" onsubmit="confirmMoveComponentToStock(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="mtsCompId">
+                        <div class="p-3 bg-light rounded border mb-3">
+                            <div id="mtsCompSummary" class="fw-bold"></div>
+                            <small id="mtsOriginSummary" class="text-muted"></small>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Destino</label>
                             <input type="text" id="mtsDestino" class="form-control" value="Stock / Resguardo" required>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Estatus *</label>
-                            <select id="mtsEstatus" class="form-select" onchange="onMtsStatusChange()" required>
-                                <option value="Stock">Stock</option>
-                                <option value="Falla">Falla</option>
-                            </select>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Estatus</label>
+                                <select id="mtsEstatus" class="form-select" onchange="onMtsStatusChange()">
+                                    <option value="Stock">Stock</option>
+                                    <option value="Falla">Falla</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Desincorporación</label>
+                                <select id="mtsDesinc" class="form-select">
+                                    <option value="No">No</option>
+                                    <option value="Si">Sí</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Desincorporación *</label>
-                            <select id="mtsDesinc" class="form-select" onchange="onMtsDesincChange()" required>
-                                <option value="No">No</option>
-                                <option value="Si">Si</option>
-                            </select>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Fecha Desinc.</label>
+                                <input type="date" id="mtsFecha" class="form-control">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Oficio</label>
+                                <input type="text" id="mtsOficio" class="form-control text-uppercase">
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Fecha de Desincorporación / Traspaso</label>
-                            <input type="date" id="mtsFecha" class="form-control">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Oficio de Desincorporación / Traspaso</label>
-                            <input type="text" id="mtsOficio" class="form-control text-uppercase" placeholder="Ej. INE/JDE03/VRFE/0045/2026">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Motivo por el que ya no se usa en la estación *</label>
-                            <input type="text" id="mtsMotivo" class="form-control" required placeholder="Ej. Ya no se requiere en la estación / Reemplazo por equipo nuevo">
+                        <div>
+                            <label class="form-label fw-semibold">Motivo</label>
+                            <textarea id="mtsMotivo" class="form-control" rows="2"></textarea>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-pink fw-semibold">
-                        <i class="bi bi-check2-circle me-1"></i>Quitar de Asignación, Pasar a Stock e Imprimir
-                    </button>
-                </div>
-            </form>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-dark fw-semibold">Confirmar y Generar Formato</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- ==================== MODAL REPORTAR FALLA ==================== -->
-<div class="modal fade" id="reportFaultModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-ticket-perforated-fill me-2"></i>Levantar Ticket de Servicio / Reportar Falla</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="faultForm" onsubmit="submitFaultReport(event)">
-                <div class="modal-body">
-                    <input type="hidden" id="faultCompId">
-                    <div class="p-3 rounded-3 bg-light border mb-3">
-                        <div class="row">
-                            <div class="col-md-6"><strong>Equipo:</strong> <span id="faultCompInfo"></span></div>
-                            <div class="col-md-6"><strong>Serie:</strong> <span id="faultCompSerie" class="font-monospace fw-bold"></span></div>
-                            <div class="col-12 mt-1"><strong>Ubicación / Usuario:</strong> <span id="faultLocationInfo"></span></div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Clasificación de la Falla *</label>
-                        <select id="faultCategory" class="form-select" required>
-                            <option value="No enciende / Sin energía">No enciende / Sin energía</option>
-                            <option value="Falla de impresión / Atascos">Falla de impresión / Atascos</option>
-                            <option value="No captura / Sensor o Lente con falla">No captura / Sensor o Lente con falla</option>
-                            <option value="Problema de red / Conexión / USB">Problema de red / Conexión / USB</option>
-                            <option value="Pantalla / Video / Lentitud crítica">Pantalla / Video / Lentitud crítica</option>
-                            <option value="Daño físico / Carcasa / Cableado">Daño físico / Carcasa / Cableado</option>
-                            <option value="Otro">Otro</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Descripción Detallada de la Falla *</label>
-                        <textarea id="faultDescription" class="form-control" rows="3" required placeholder="Describe qué ocurre, códigos de error, ruidos o síntomas..."></textarea>
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label fw-semibold">Fotografía de Evidencia (Opcional)</label>
-                        <input type="file" id="faultPhotoInput" class="form-control form-control-sm" accept="image/*" onchange="previewImageFile(event, 'faultPhotoPreview', 'faultPhotoImg', 'currentFaultPhoto')">
-                        <div id="faultPhotoPreview" class="mt-2 d-none d-flex align-items-center gap-2">
-                            <img id="faultPhotoImg" src="" class="img-thumb">
-                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearImageField('faultPhotoInput', 'faultPhotoPreview', 'currentFaultPhoto')">Quitar foto</button>
-                        </div>
-                    </div>
+    <!-- Modal Levantar Ticket de Falla -->
+    <div class="modal fade" id="reportFaultModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-ticket-perforated-fill me-2"></i>Levantar Ticket de Servicio</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-danger fw-semibold">
-                        <i class="bi bi-send-check me-1"></i>Generar Ticket y Hoja de Servicio
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- ==================== MODAL SEGUIMIENTO / RESOLVER TICKET ==================== -->
-<div class="modal fade" id="resolveFaultModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-check2-circle me-2"></i>Seguimiento y Dictamen de Ticket</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="resolveFaultForm" onsubmit="submitResolveFault(event)">
-                <div class="modal-body">
-                    <input type="hidden" id="resolveFaultId">
-                    <div class="p-3 rounded-3 bg-light border mb-3">
-                        <div class="d-flex justify-content-between flex-wrap gap-2">
-                            <strong>Ticket: <span id="resolveFolioInfo" class="text-danger font-monospace"></span></strong>
-                            <span id="resolveCompInfo" class="small fw-semibold"></span>
+                <form id="faultForm" onsubmit="submitFaultReport(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="faultCompId">
+                        <div class="p-3 bg-light rounded border mb-3">
+                            <div id="faultCompInfo" class="fw-bold"></div>
+                            <div>Serie: <strong id="faultCompSerie" class="font-monospace"></strong></div>
+                            <small id="faultLocationInfo" class="text-muted"></small>
                         </div>
-                        <div class="small text-muted mt-1"><strong>Reporte original:</strong> <span id="resolveOriginalDesc"></span></div>
-                    </div>
 
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Estatus del Ticket *</label>
-                            <select id="resolveStatusSelect" class="form-select" required>
-                                <option value="Finalizada">Finalizada / Arreglada</option>
-                                <option value="En Seguimiento / En Proceso">En Seguimiento / En Proceso</option>
-                                <option value="Ticket Abierto / Pendiente">Ticket Abierto / Pendiente</option>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Clasificación de la Falla</label>
+                            <select id="faultCategory" class="form-select" required>
+                                <option value="No enciende / Sin energía">No enciende / Sin energía</option>
+                                <option value="Falla de hardware / Componente">Falla de hardware / Componente</option>
+                                <option value="Falla de impresión / Escaneo">Falla de impresión / Escaneo</option>
+                                <option value="Falla biométrica / Firma / Cámara">Falla biométrica / Firma / Cámara</option>
+                                <option value="Falla de red / Conectividad">Falla de red / Conectividad</option>
+                                <option value="Otro">Otro</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Tipo de Solución / Acción *</label>
-                            <select id="resolveActionType" class="form-select" required>
-                                <option value="Reparación en sitio / Configuración">Reparación en sitio / Configuración</option>
-                                <option value="Cambio de refacción / Consumible / Cable">Cambio de refacción / Consumible / Cable</option>
-                                <option value="Reemplazo de equipo / Resguardo">Reemplazo de equipo / Resguardo</option>
-                                <option value="Diagnóstico / Escalación a Soporte Central">Diagnóstico / Escalación a Soporte Central</option>
-                            </select>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Descripción Detallada</label>
+                            <textarea id="faultDescription" class="form-control" rows="3" required></textarea>
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label fw-semibold">Técnico o Responsable que Atiende *</label>
-                            <input type="text" id="resolveTechnician" class="form-control" required placeholder="Nombre del técnico o responsable de atención">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Trabajos Realizados y Observaciones *</label>
-                            <textarea id="resolveNotes" class="form-control" rows="3" required placeholder="Describe la solución aplicada, pruebas realizadas o avance del ticket..."></textarea>
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="resolveRestoreComponent" checked>
-                                <label class="form-check-label fw-semibold" for="resolveRestoreComponent">
-                                    Marcar el componente como <strong>Operativo</strong> al finalizar el ticket
-                                </label>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Foto Evidencia (opcional)</label>
+                            <input type="file" id="faultPhotoInput" accept="image/*" class="form-control form-control-sm" onchange="previewImageFile(event, 'faultPhotoPreview', 'faultPhotoImg', 'currentFaultPhoto')">
+                            <div id="faultPhotoPreview" class="d-none mt-2">
+                                <img id="faultPhotoImg" src="" class="img-thumb">
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="clearImageField('faultPhotoInput', 'faultPhotoPreview', 'currentFaultPhoto')">Quitar</button>
                             </div>
                         </div>
                     </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger fw-semibold">Generar Ticket</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Seguimiento / Resolver Ticket -->
+    <div class="modal fade" id="resolveFaultModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-check2-circle me-2"></i>Seguimiento / Cierre de Ticket</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success fw-semibold">
-                        <i class="bi bi-check2-all me-1"></i>Guardar y Generar Hoja de Servicio
+                <form id="resolveFaultForm" onsubmit="submitResolveFault(event)">
+                    <div class="modal-body">
+                        <input type="hidden" id="resolveFaultId">
+                        <div class="p-3 bg-light rounded border mb-3">
+                            <div class="fw-bold text-danger" id="resolveFolioInfo"></div>
+                            <div id="resolveCompInfo" class="fw-semibold"></div>
+                            <small id="resolveOriginalDesc" class="text-muted"></small>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Estatus del Ticket</label>
+                            <select id="resolveStatusSelect" class="form-select">
+                                <option value="En Seguimiento">En Seguimiento</option>
+                                <option value="Finalizada">Finalizada</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Técnico / Responsable</label>
+                            <input type="text" id="resolveTechnician" class="form-control" required>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-semibold">Tipo de Solución</label>
+                            <input type="text" id="resolveActionType" class="form-control" placeholder="Ej. Limpieza, reemplazo de cable, configuración" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Notas de Seguimiento / Dictamen</label>
+                            <textarea id="resolveNotes" class="form-control" rows="3" required></textarea>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="resolveRestoreComponent" checked>
+                            <label class="form-check-label" for="resolveRestoreComponent">
+                                Marcar componente como <strong>Operativo</strong> al finalizar
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success fw-semibold">Guardar y Generar Hoja</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Impresión / Hoja de Servicio -->
+    <div class="modal fade" id="printModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="printModalHeaderTitle">
+                        <i class="bi bi-printer me-2"></i>Hoja de Servicio
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <div id="printFormatArea" class="bg-white p-4 rounded border shadow-sm"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-dark" onclick="printReportArea()">
+                        <i class="bi bi-printer-fill me-1"></i>Imprimir / Guardar PDF
                     </button>
                 </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- ==================== MODAL IMPRESIÓN HOJA DE SERVICIO / TRASPASO ==================== -->
-<div class="modal fade" id="printModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white no-print">
-                <h5 id="printModalHeaderTitle" class="modal-title fw-bold"><i class="bi bi-printer me-2"></i>Hoja de Servicio</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body bg-secondary bg-opacity-10">
-                <div id="printFormatArea" class="p-4 bg-white rounded-2 shadow-sm"></div>
-            </div>
-            <div class="modal-footer bg-light no-print">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                <button type="button" class="btn btn-dark fw-semibold" onclick="window.print()">
-                    <i class="bi bi-printer-fill me-1"></i>Imprimir / Guardar PDF
-                </button>
             </div>
         </div>
     </div>
-</div>
 
-<!-- ==================== MODAL ESCÁNER CÁMARA ==================== -->
-<div class="modal fade" id="scannerModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-upc-scan text-danger me-2"></i>Escanear Código de Barras / QR</h5>
-                <button type="button" class="btn-close btn-close-white" onclick="closeScanner()"></button>
-            </div>
-            <div class="modal-body text-center">
-                <div id="reader"></div>
-                <p class="text-muted small mt-2 mb-0">Apunta la cámara hacia el código de serie o inventario del equipo.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary w-100" onclick="closeScanner()">Cancelar Escaneo</button>
+    <!-- Modal Escáner QR / Código de Barras -->
+    <div class="modal fade" id="scannerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-qr-code-scan me-2"></i>Escanear Código / Serie</h5>
+                    <button type="button" class="btn-close btn-close-white" onclick="closeScanner()"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="reader" style="width: 100%;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeScanner()">Cerrar Cámara</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- ==================== MODAL VER FOTO COMPLETA ==================== -->
-<div class="modal fade" id="photoModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-dark text-white">
-                <h6 id="photoModalTitle" class="modal-title fw-bold">Fotografía</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center bg-light">
-                <img id="modalFullImage" src="" class="img-fluid rounded-3" style="max-height: 70vh;">
+    <!-- Modal Ver Foto Ampliada -->
+    <div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold" id="photoModalTitle">Vista Previa</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalFullImage" src="" class="img-fluid rounded">
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script type="module" src="./app.js"></script>
+    <!-- Contenedor exclusivo para impresión limpia -->
+    <div id="printSheetContainer"></div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Código principal -->
+    <script type="module" src="./app.js"></script>
 </body>
 </html>
