@@ -614,8 +614,8 @@ async function saveComponentFromModal(e) {
 
     if (isOp) refreshOperatorUI();
     else refreshAdminUI({ preserveSelection: true });
-
 }
+
 // ==================== RENDERIZADO AGRUPADO POR COMPONENTE CON ÍCONOS ====================
 function groupComponentsByType(list) {
     const map = new Map();
@@ -688,11 +688,11 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                         <td><span class="fst-italic text-muted">Sin serie ni datos</span></td>
                                         <td><span class="badge bg-light text-secondary border">No Aplica</span></td>
                                         <td class="text-end">
-                                            <div class="d-flex justify-content-end gap-1">
-                                                <button class="btn btn-sm btn-outline-secondary" title="Editar" onclick="editComponentById('${c.id}')">
+                                            <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap">
+                                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size: 0.72rem;" title="Editar" onclick="editComponentById('${c.id}')">
                                                     <i class="bi bi-pencil"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-secondary" title="Eliminar registro" onclick="deleteComponent('${c.id}')">
+                                                <button class="btn btn-outline-secondary py-0 px-1" style="font-size: 0.72rem;" title="Eliminar registro" onclick="deleteComponent('${c.id}')">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             </div>
@@ -744,18 +744,18 @@ function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
                                     </td>
                                     <td>${getStatusBadge(c.estado_fisico)}</td>
                                     <td class="text-end">
-                                        <div class="d-flex justify-content-end gap-1 flex-wrap">
-                                            <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="editComponentById('${c.id}')">
+                                        <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap">
+                                            <button class="btn btn-outline-primary py-0 px-1" style="font-size: 0.72rem;" title="Editar" onclick="editComponentById('${c.id}')">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-warning text-dark fw-semibold" title="Quitar de asignacion y enviar a Stock" onclick="openMoveToStockModal('${c.id}')">
-                                                <i class="bi bi-box-arrow-in-down me-1"></i>A Stock
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-secondary" title="Eliminar" onclick="deleteComponent('${c.id}')">
+                                            <button class="btn btn-outline-secondary py-0 px-1" style="font-size: 0.72rem;" title="Eliminar" onclick="deleteComponent('${c.id}')">
                                                 <i class="bi bi-trash"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-danger fw-semibold" title="Levantar Ticket de Servicio" onclick="openReportFaultModal('${c.id}')">
-                                                <i class="bi bi-ticket-perforated-fill me-1"></i>Reportar Falla
+                                            <button class="btn btn-outline-danger fw-semibold py-0 px-1" style="font-size: 0.72rem;" title="Levantar Ticket de Servicio" onclick="openReportFaultModal('${c.id}')">
+                                                <i class="bi bi-ticket-perforated-fill"></i> Falla
+                                            </button>
+                                            <button class="btn btn-outline-warning text-dark fw-semibold py-0 px-1" style="font-size: 0.72rem;" title="Quitar de asignacion y enviar a Stock" onclick="openMoveToStockModal('${c.id}')">
+                                                <i class="bi bi-box-arrow-in-down"></i> A Stock
                                             </button>
                                         </div>
                                     </td>
@@ -907,11 +907,34 @@ async function deleteStockItem(id) {
     refreshAdminUI({ preserveSelection: true });
 }
 
+async function markStockAsDesincorporated(id) {
+    const idx = (appState.stock_resguardo || []).findIndex(s => s.id === id);
+    if (idx === -1) return;
+    const item = appState.stock_resguardo[idx];
+
+    const oficio = prompt(
+        `Marcar como DESINCORPORADO:\n${item.descripcion} (${item.numero_serie})\n\nIngresa el número de oficio (opcional):`,
+        item.oficio_desincorporacion || ""
+    );
+    if (oficio === null) return;
+
+    const fechaDefault = item.fecha_desincorporacion || new Date().toISOString().slice(0, 10);
+    const fecha = prompt("Fecha de desincorporación (YYYY-MM-DD):", fechaDefault);
+    if (fecha === null) return;
+
+    appState.stock_resguardo[idx] = normalizeStockRecord({
+        ...item,
+        estatus: "Desincorporado",
+        desincorporacion: "Si",
+        oficio_desincorporacion: oficio.trim().toUpperCase(),
+        fecha_desincorporacion: fecha.trim()
+    });
+
+    await saveState();
+    refreshAdminUI({ preserveSelection: true });
+}
+
 function renderAdminStockTable() {
-    const isDesincRecord = (s) => s.desincorporacion === "Si" || Boolean(s.oficio_desincorporacion);
-    const disponibles = list.filter(s => !isDesincRecord(s) && s.estatus === "Stock").length;
-    const enFalla = list.filter(s => !isDesincRecord(s) && s.estatus === "Falla").length;
-    const paraDesinc = list.filter(s => isDesincRecord(s)).length;
     const list = appState.stock_resguardo || [];
     const totalEl = document.getElementById("stockStatTotal");
     const dispEl = document.getElementById("stockStatDisponibles");
@@ -919,9 +942,14 @@ function renderAdminStockTable() {
     const desincEl = document.getElementById("stockStatDesinc");
     const badgeEl = document.getElementById("admStockBadge");
 
-    const disponibles = list.filter(s => s.estatus === "Stock").length;
-    const enFalla = list.filter(s => s.estatus === "Falla").length;
-    const paraDesinc = list.filter(s => s.desincorporacion === "Si").length;
+    const isDesincRecord = (s) =>
+        s.desincorporacion === "Si" ||
+        s.estatus === "Desincorporado" ||
+        Boolean(s.oficio_desincorporacion);
+
+    const disponibles = list.filter(s => !isDesincRecord(s) && s.estatus === "Stock").length;
+    const enFalla = list.filter(s => !isDesincRecord(s) && s.estatus === "Falla").length;
+    const paraDesinc = list.filter(s => isDesincRecord(s)).length;
 
     if (totalEl) totalEl.textContent = list.length;
     if (dispEl) dispEl.textContent = disponibles;
@@ -941,10 +969,14 @@ function renderAdminStockTable() {
         .trim();
 
     const filtered = list.filter(s => {
-        if (fEstatus !== "ALL" && s.estatus !== fEstatus) return false;
-        if (fDesinc !== "ALL" && s.desincorporacion !== fDesinc) return false;
+        const isDesinc = isDesincRecord(s);
+        const effectiveStatus = isDesinc ? "Desincorporado" : (s.estatus || "Stock");
+        const effectiveDesinc = isDesinc ? "Si" : "No";
+
+        if (fEstatus !== "ALL" && effectiveStatus !== fEstatus) return false;
+        if (fDesinc !== "ALL" && effectiveDesinc !== fDesinc) return false;
         if (search) {
-            const haystack = `${s.origen} ${s.destino} ${s.inventario_ine} ${s.descripcion} ${s.marca} ${s.modelo} ${s.numero_serie} ${s.serie_lente} ${s.estatus} ${s.desincorporacion} ${s.fecha_desincorporacion} ${s.oficio_desincorporacion} ${s.observaciones}`
+            const haystack = `${s.origen} ${s.destino} ${s.inventario_ine} ${s.descripcion} ${s.marca} ${s.modelo} ${s.numero_serie} ${s.serie_lente} ${effectiveStatus} ${effectiveDesinc} ${s.fecha_desincorporacion} ${s.oficio_desincorporacion} ${s.observaciones}`
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "");
@@ -961,8 +993,8 @@ function renderAdminStockTable() {
 
     tbody.innerHTML = filtered.map(s => {
         const iconClass = getComponentIcon(s.descripcion);
-        const isFalla = s.estatus === "Falla";
-        const isDesinc = s.desincorporacion === "Si";
+        const isDesinc = isDesincRecord(s);
+        const isFalla = !isDesinc && s.estatus === "Falla";
 
         return `
             <tr>
@@ -971,21 +1003,23 @@ function renderAdminStockTable() {
                 <td class="fw-bold font-monospace">${s.inventario_ine || "—"}</td>
                 <td class="fw-semibold">
                     <i class="bi ${iconClass} text-danger me-1"></i>${s.descripcion}
-                    ${s.observaciones ? `<div class="text-muted fw-normal">${s.observaciones}</div>` : ""}
+                    ${s.observaciones ? `<div class="text-muted fw-normal small">${s.observaciones}</div>` : ""}
                 </td>
                 <td><strong>${s.marca}</strong> <span class="text-muted">${s.modelo}</span></td>
                 <td>
                     <span class="font-monospace fw-bold bg-light px-2 py-1 rounded border">${s.numero_serie}</span>
-                    ${s.serie_lente ? `<div class="text-secondary mt-1"><i class="bi bi-camera-reels me-1"></i>Lente: <strong class="font-monospace">${s.serie_lente}</strong></div>` : ""}
-                </td>
-                <td>
-                    ${isFalla
-                        ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Falla</span>`
-                        : `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Stock</span>`}
+                    ${s.serie_lente ? `<div class="text-secondary small mt-1"><i class="bi bi-camera-reels me-1"></i>Lente: <strong class="font-monospace">${s.serie_lente}</strong></div>` : ""}
                 </td>
                 <td>
                     ${isDesinc
-                        ? `<span class="badge bg-warning text-dark">Sí (Desincorporación)</span>`
+                        ? `<span class="badge bg-secondary-subtle text-dark border">Desincorporado</span>`
+                        : (isFalla
+                            ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Falla</span>`
+                            : `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Stock</span>`)}
+                </td>
+                <td>
+                    ${isDesinc
+                        ? `<span class="badge bg-warning text-dark">Sí</span>`
                         : `<span class="badge bg-success-subtle text-success border border-success-subtle">No</span>`}
                 </td>
                 <td>
@@ -995,11 +1029,16 @@ function renderAdminStockTable() {
                         : `<span class="text-muted">—</span>`}
                 </td>
                 <td class="text-end">
-                    <div class="d-flex justify-content-end gap-1">
-                        <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="editStockById('${s.id}')">
+                    <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap">
+                        ${!isDesinc ? `
+                            <button class="btn btn-warning text-dark fw-semibold py-0 px-1" style="font-size: 0.72rem;" title="Marcar como desincorporado" onclick="markStockAsDesincorporated('${s.id}')">
+                                <i class="bi bi-check2-square"></i> Desinc.
+                            </button>
+                        ` : ""}
+                        <button class="btn btn-outline-primary py-0 px-1" style="font-size: 0.72rem;" title="Editar" onclick="editStockById('${s.id}')">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" title="Eliminar" onclick="deleteStockItem('${s.id}')">
+                        <button class="btn btn-outline-danger py-0 px-1" style="font-size: 0.72rem;" title="Eliminar" onclick="deleteStockItem('${s.id}')">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
@@ -1509,6 +1548,7 @@ function refreshActiveScreens() {
         }
     }
 }
+
 // ==================== INICIALIZACIÓN ====================
 window.addEventListener("DOMContentLoaded", () => {
     fillStationOptions(
@@ -1758,7 +1798,6 @@ function refreshOperatorUI() {
         `}).join("");
     }
 }
-
 // ==================== LÓGICA VISTA ADMINISTRADOR ====================
 function switchAdminTab(tab) {
     activeAdminTab = tab;
@@ -1808,8 +1847,6 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
 
     renderAdminInventoryGrouped();
     renderAdminStockTable();
-    const isDesinc = isDesincRecord(s);
-    const isFalla = !isDesinc && s.estatus === "Falla";
     renderTransfersPanel();
     renderOperatorsTable();
     renderCatalogs();
@@ -2963,6 +3000,7 @@ Object.assign(window, {
     editStockById,
     saveStockFromModal,
     deleteStockItem,
+    markStockAsDesincorporated,
     renderAdminStockTable,
     exportStockExcel,
     openMoveToStockModal,
