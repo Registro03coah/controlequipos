@@ -12,6 +12,16 @@ import {
     saveState
 } from "./part1-core.js";
 
+function findAssignedComponentBySerial(serie, excludeId = "") {
+    const clean = String(serie || "").trim().toUpperCase();
+    if (!clean || clean === "NO APLICA") return null;
+    return (appState.componentes || []).find(
+        c => !isNoAplicaComponent(c) &&
+             String(c.numero_serie || "").trim().toUpperCase() === clean &&
+             c.id !== excludeId
+    ) || null;
+}
+
 // ==================== STOCK / BODEGA Y DESINCORPORACIÓN ====================
 export function onStockStatusChange() {
     const estatus = document.getElementById("stockEstatus").value;
@@ -84,9 +94,22 @@ export async function saveStockFromModal(e, refreshAdminUI) {
     const oficio_desincorporacion = document.getElementById("stockOficioDesinc").value.trim().toUpperCase();
     const observaciones = document.getElementById("stockObservaciones").value.trim();
 
-    const dup = appState.stock_resguardo.find(s => s.numero_serie === numero_serie && s.id !== editId);
-    if (dup) {
-        alert(`La serie "${numero_serie}" ya esta registrada en Stock (Origen: ${dup.origen}).`);
+    const dupStock = (appState.stock_resguardo || []).find(
+        s => String(s.numero_serie || "").trim().toUpperCase() === numero_serie && s.id !== editId
+    );
+    if (dupStock) {
+        alert(`La serie "${numero_serie}" ya está registrada en Stock (Origen: ${dupStock.origen}).`);
+        return;
+    }
+
+    const dupComp = findAssignedComponentBySerial(numero_serie);
+    if (dupComp) {
+        alert(
+            `La serie "${numero_serie}" ya está asignada en Inventario Global:\n` +
+            `• Módulo / Estación: ${dupComp.modulo} / ${formatStationLabel(dupComp.estacion)}\n` +
+            `• Equipo: ${dupComp.tipo_componente} (${dupComp.marca} ${dupComp.modelo})\n\n` +
+            `Primero envíalo a Stock desde su estación o retira la asignación previa antes de registrarlo aquí.`
+        );
         return;
     }
 
@@ -224,9 +247,38 @@ export async function confirmAssignStockToModule(event, refreshAdminUI) {
     const obsAsignacion = document.getElementById("assignStockObservaciones").value.trim();
 
     if (item.numero_serie) {
-        const dupComp = appState.componentes.find(c => !isNoAplicaComponent(c) && c.numero_serie === item.numero_serie);
+        const serieNorm = String(item.numero_serie || "").trim().toUpperCase();
+        const dupComp = findAssignedComponentBySerial(serieNorm);
+        const otherStockMatches = (appState.stock_resguardo || []).filter(
+            (s, idx) => idx !== stockIndex && String(s.numero_serie || "").trim().toUpperCase() === serieNorm
+        );
+
         if (dupComp) {
-            alert(`La serie "${item.numero_serie}" ya existe asignada en ${dupComp.modulo} / ${formatStationLabel(dupComp.estacion)}.`);
+            const ubicacionModulo = `${dupComp.modulo} / ${formatStationLabel(dupComp.estacion)}`;
+            const opModulo = getOperatorByStation(dupComp.modulo, dupComp.estacion);
+            const respTxt = opModulo ? ` (${opModulo.nombre_completo})` : "";
+
+            const detalleStock = otherStockMatches.length
+                ? `\n• También aparece repetida en ${otherStockMatches.length} registro(s) adicional(es) de Stock.`
+                : `\n• Actualmente también figura en Stock (Origen: ${item.origen || "—"}).`;
+
+            const removeFromStock = confirm(
+                `La serie "${item.numero_serie}" ya está asignada en:\n` +
+                `• Módulo / Estación: ${ubicacionModulo}${respTxt}\n` +
+                `• Componente: ${dupComp.tipo_componente} (${dupComp.marca} ${dupComp.modelo})` +
+                detalleStock + `\n\n` +
+                `No se asignará duplicada al ${moduloDestino} / ${formatStationLabel(estacionDestino)}.\n` +
+                `¿Deseas eliminar este registro duplicado de Stock para que ya no aparezca ahí?`
+            );
+
+            if (removeFromStock) {
+                appState.stock_resguardo.splice(stockIndex, 1);
+                await saveState();
+                const modalEl = document.getElementById("assignStockModal");
+                const inst = bootstrap.Modal.getInstance(modalEl);
+                if (inst) inst.hide();
+                if (typeof refreshAdminUI === "function") refreshAdminUI({ preserveSelection: true });
+            }
             return;
         }
     }
@@ -330,6 +382,7 @@ export function renderAdminStockTable() {
         const iconClass = getComponentIcon(s.descripcion);
         const isDesinc = isDesincRecord(s);
         const isFalla = !isDesinc && s.estatus === "Falla";
+        const dupComp = findAssignedComponentBySerial(s.numero_serie);
 
         return `
             <tr>
@@ -343,6 +396,7 @@ export function renderAdminStockTable() {
                 <td><strong>${s.marca}</strong> <span class="text-muted">${s.modelo}</span></td>
                 <td>
                     <span class="font-monospace fw-bold bg-light px-2 py-1 rounded border">${s.numero_serie}</span>
+                    ${dupComp ? `<div class="text-danger small fw-semibold mt-1"><i class="bi bi-exclamation-triangle me-1"></i>También en ${dupComp.modulo} / ${formatStationLabel(dupComp.estacion)}</div>` : ""}
                     ${s.serie_lente ? `<div class="text-secondary small mt-1"><i class="bi bi-camera-reels me-1"></i>Lente: <strong class="font-monospace">${s.serie_lente}</strong></div>` : ""}
                 </td>
                 <td>
