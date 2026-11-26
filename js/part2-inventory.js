@@ -1,7 +1,7 @@
 import {
     appState,
     currentUser,
-    activeOpTab,
+    setActiveOpTab,
     DEFAULT_AVATAR,
     html5QrCode,
     targetScannerInputId,
@@ -317,10 +317,24 @@ export async function saveComponentFromModal(e, hooks = {}) {
     const observaciones = isNA ? "" : document.getElementById("compNotas").value.trim();
 
     if (!isNA) {
-        const dup = appState.componentes.find(c => !isNoAplicaComponent(c) && c.numero_serie === numero_serie && c.id !== editId);
+        const dup = appState.componentes.find(
+            c => !isNoAplicaComponent(c) &&
+                 String(c.numero_serie || "").trim().toUpperCase() === numero_serie &&
+                 c.id !== editId
+        );
         if (dup) {
             alert(`El numero de serie "${numero_serie}" ya esta registrado en ${dup.modulo} - ${formatStationLabel(dup.estacion)}.`);
             return;
+        }
+
+        const dupStock = (appState.stock_resguardo || []).find(
+            s => String(s.numero_serie || "").trim().toUpperCase() === numero_serie
+        );
+        if (dupStock) {
+            alert(
+                `Aviso: la serie "${numero_serie}" también figura en Stock / Resguardo ` +
+                `(Origen: ${dupStock.origen || "—"}, Estatus: ${dupStock.estatus || "Stock"}).`
+            );
         }
     }
 
@@ -640,7 +654,6 @@ export function renderAdminInventoryGrouped() {
     const search = normalizeText(document.getElementById("adminSearchInput").value);
     const terms = search ? search.split(/\s+/).filter(Boolean) : [];
 
-    // 1. Asignados a Módulos y Estaciones
     const filteredAssigned = appState.componentes.filter(c => {
         if (fMod !== "ALL" && c.modulo !== fMod) return false;
         if (fTipo !== "ALL" && normalizeText(c.tipo_componente) !== normalizeText(fTipo)) return false;
@@ -664,7 +677,6 @@ export function renderAdminInventoryGrouped() {
         return true;
     });
 
-    // 2. Stock / Resguardo y Desincorporados (separados sin mezclar con asignados)
     const stockList = appState.stock_resguardo || [];
     const isDesincRecord = (s) =>
         s.desincorporacion === "Si" ||
