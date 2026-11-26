@@ -89,12 +89,19 @@ function normalizeComponentRecord(raw = {}) {
 }
 
 function normalizeStockRecord(raw = {}) {
-    const estRaw = String(raw.estatus ?? "Stock").trim().toLowerCase();
-    const estatus = estRaw === "falla" ? "Falla" : "Stock";
-
     const desincRaw = String(raw.desincorporacion ?? "No").trim().toLowerCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const desincorporacion = desincRaw === "si" ? "Si" : "No";
+    const oficio = String(raw.oficio_desincorporacion ?? raw.oficioDesincorporacion ?? "").trim().toUpperCase();
+    const fechaDesinc = String(raw.fecha_desincorporacion ?? raw.fechaDesincorporacion ?? "").trim();
+
+    const isDesinc = desincRaw === "si" || Boolean(oficio);
+    const desincorporacion = isDesinc ? "Si" : "No";
+
+    const estRaw = String(raw.estatus ?? "Stock").trim().toLowerCase();
+    let estatus = estRaw === "falla" ? "Falla" : (estRaw === "desincorporado" ? "Desincorporado" : "Stock");
+    if (isDesinc && estatus === "Falla") {
+        estatus = "Desincorporado";
+    }
 
     let origen = String(raw.origen ?? raw.ubicacion ?? "050351").trim();
     if (origen === "500351") origen = "050351";
@@ -111,8 +118,8 @@ function normalizeStockRecord(raw = {}) {
         serie_lente: String(raw.serie_lente ?? raw.lente ?? "").trim().toUpperCase(),
         estatus,
         desincorporacion,
-        fecha_desincorporacion: String(raw.fecha_desincorporacion ?? raw.fechaDesincorporacion ?? "").trim(),
-        oficio_desincorporacion: String(raw.oficio_desincorporacion ?? raw.oficioDesincorporacion ?? "").trim().toUpperCase(),
+        fecha_desincorporacion: fechaDesinc,
+        oficio_desincorporacion: oficio,
         observaciones: String(raw.observaciones ?? "").trim(),
         fecha_registro: String(raw.fecha_registro ?? new Date().toLocaleString("es-MX"))
     };
@@ -901,6 +908,10 @@ async function deleteStockItem(id) {
 }
 
 function renderAdminStockTable() {
+    const isDesincRecord = (s) => s.desincorporacion === "Si" || Boolean(s.oficio_desincorporacion);
+    const disponibles = list.filter(s => !isDesincRecord(s) && s.estatus === "Stock").length;
+    const enFalla = list.filter(s => !isDesincRecord(s) && s.estatus === "Falla").length;
+    const paraDesinc = list.filter(s => isDesincRecord(s)).length;
     const list = appState.stock_resguardo || [];
     const totalEl = document.getElementById("stockStatTotal");
     const dispEl = document.getElementById("stockStatDisponibles");
@@ -1797,6 +1808,8 @@ function refreshAdminUI({ preserveSelection = false } = {}) {
 
     renderAdminInventoryGrouped();
     renderAdminStockTable();
+    const isDesinc = isDesincRecord(s);
+    const isFalla = !isDesinc && s.estatus === "Falla";
     renderTransfersPanel();
     renderOperatorsTable();
     renderCatalogs();
