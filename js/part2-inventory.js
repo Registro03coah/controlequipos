@@ -68,8 +68,9 @@ export function showPhotoModal(src, title) {
 export function getStatusBadge(status) {
     if (status === "Operativo") return `<span class="badge bg-success-subtle text-success border border-success-subtle">Operativo</span>`;
     if (status === "Stock") return `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Stock</span>`;
-    if (status === "En Falla") return `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">En Falla</span>`;
+    if (status === "En Falla" || status === "Falla") return `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">${status === "Falla" ? "Falla" : "En Falla"}</span>`;
     if (status === "En Revision" || status === "En Revisión") return `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">En Revision</span>`;
+    if (status === "Desincorporado") return `<span class="badge bg-warning text-dark">Desincorporado</span>`;
     if (status === "No Aplica") return `<span class="badge bg-light text-secondary border">No Aplica</span>`;
     return `<span class="badge bg-secondary-subtle text-secondary border">Baja</span>`;
 }
@@ -526,6 +527,83 @@ export function renderGroupedCardsHtml(items, { showLocation = false } = {}) {
     `}).join("");
 }
 
+function renderStockSectionBlock(items, { title, badgeClass, headerBg, emptyText, isDesincSection }) {
+    return `
+        <div class="border rounded-3 mb-3 overflow-hidden bg-white">
+            <div class="${headerBg} px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark">${title}</span>
+                <span class="badge ${badgeClass}">${items.length} ${items.length === 1 ? "equipo" : "equipos"}</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Origen / Destino</th>
+                            <th>Descripción</th>
+                            <th>Marca y Modelo</th>
+                            <th>N° Serie / Inv. INE</th>
+                            <th>${isDesincSection ? "Fecha / Oficio" : "Estatus"}</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.length ? items.map(s => {
+                            const iconClass = getComponentIcon(s.descripcion);
+                            return `
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-dark">${s.origen || "—"}</span>
+                                        ${s.destino ? `<div class="small fw-semibold text-primary mt-1">${s.destino}</div>` : ""}
+                                    </td>
+                                    <td class="fw-semibold">
+                                        <i class="bi ${iconClass} text-danger me-1"></i>${s.descripcion}
+                                        ${s.observaciones ? `<div class="text-muted fw-normal small">${s.observaciones}</div>` : ""}
+                                    </td>
+                                    <td>
+                                        <strong>${s.marca}</strong> <span class="text-muted">${s.modelo}</span>
+                                    </td>
+                                    <td>
+                                        <span class="font-monospace fw-bold bg-light px-2 py-1 rounded border">${s.numero_serie}</span>
+                                        ${s.inventario_ine ? `<div class="text-secondary small mt-1">Inv. INE: <strong>${s.inventario_ine}</strong></div>` : ""}
+                                        ${s.serie_lente ? `<div class="text-secondary small"><i class="bi bi-camera-reels me-1"></i>Lente: <strong class="font-monospace">${s.serie_lente}</strong></div>` : ""}
+                                    </td>
+                                    <td>
+                                        ${isDesincSection
+                                            ? `${getStatusBadge("Desincorporado")}
+                                               ${s.fecha_desincorporacion ? `<div class="small fw-semibold mt-1"><i class="bi bi-calendar-event me-1"></i>${s.fecha_desincorporacion}</div>` : ""}
+                                               ${s.oficio_desincorporacion ? `<div class="mt-1"><span class="badge bg-light text-dark border font-monospace">${s.oficio_desincorporacion}</span></div>` : ""}`
+                                            : getStatusBadge(s.estatus || "Stock")}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap">
+                                            ${!isDesincSection ? `
+                                                <button class="btn btn-outline-primary fw-semibold py-0 px-1" style="font-size: 0.72rem;" title="Asignar a Módulo y Estación" onclick="openAssignStockModal('${s.id}')">
+                                                    <i class="bi bi-box-arrow-right"></i> Asignar
+                                                </button>
+                                                <button class="btn btn-warning text-dark fw-semibold py-0 px-1" style="font-size: 0.72rem;" title="Marcar como desincorporado" onclick="markStockAsDesincorporated('${s.id}')">
+                                                    <i class="bi bi-check2-square"></i> Desinc.
+                                                </button>
+                                            ` : ""}
+                                            <button class="btn btn-outline-primary py-0 px-1" style="font-size: 0.72rem;" title="Editar" onclick="editStockById('${s.id}')">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger py-0 px-1" style="font-size: 0.72rem;" title="Eliminar" onclick="deleteStockItem('${s.id}')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join("") : `
+                            <tr><td colspan="6" class="text-center text-muted py-3">${emptyText}</td></tr>
+                        `}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
 export function editComponentById(id, hooks = {}) {
     const c = appState.componentes.find(item => item.id === id);
     if (!c) return;
@@ -560,11 +638,13 @@ export function renderAdminInventoryGrouped() {
     const fMod = document.getElementById("adminFilterModulo").value;
     const fTipo = document.getElementById("adminFilterTipo").value;
     const search = normalizeText(document.getElementById("adminSearchInput").value);
+    const terms = search ? search.split(/\s+/).filter(Boolean) : [];
 
-    const filtered = appState.componentes.filter(c => {
+    // 1. Asignados a Módulos y Estaciones
+    const filteredAssigned = appState.componentes.filter(c => {
         if (fMod !== "ALL" && c.modulo !== fMod) return false;
         if (fTipo !== "ALL" && normalizeText(c.tipo_componente) !== normalizeText(fTipo)) return false;
-        if (search) {
+        if (terms.length) {
             const isNA = isNoAplicaComponent(c);
             const op = getOperatorByStation(c.modulo, c.estacion);
             const opName = op ? op.nombre_completo : "";
@@ -579,14 +659,70 @@ export function renderAdminInventoryGrouped() {
                 : `${c.numero_serie} ${c.inventario_ine || ""} ${c.serie_cpu_vinculada || ""} ${c.serie_lente || ""} ${c.serie_docking || ""} ${c.marca} ${c.modelo} ${c.observaciones || ""}`;
 
             const haystack = normalizeText(`${c.tipo_componente} ${c.estado_fisico} ${compDetails} ${opName} ${estLabel} ${estAliases}`);
-            const terms = search.split(/\s+/).filter(Boolean);
             if (!terms.every(term => haystack.includes(term))) return false;
         }
         return true;
     });
 
+    // 2. Stock / Resguardo y Desincorporados (separados sin mezclar con asignados)
+    const stockList = appState.stock_resguardo || [];
+    const isDesincRecord = (s) =>
+        s.desincorporacion === "Si" ||
+        s.estatus === "Desincorporado" ||
+        Boolean(s.oficio_desincorporacion);
+
+    const filterStockItems = (onlyDesinc) => stockList.filter(s => {
+        const desinc = isDesincRecord(s);
+        if (onlyDesinc && !desinc) return false;
+        if (!onlyDesinc && desinc) return false;
+
+        if (fMod !== "ALL" && s.origen !== fMod) return false;
+        if (fTipo !== "ALL" && normalizeText(s.descripcion) !== normalizeText(fTipo)) return false;
+
+        if (terms.length) {
+            const haystack = normalizeText(
+                `${s.origen || ""} ${s.destino || ""} ${s.inventario_ine || ""} ${s.descripcion || ""} ` +
+                `${s.marca || ""} ${s.modelo || ""} ${s.numero_serie || ""} ${s.serie_lente || ""} ` +
+                `${s.estatus || ""} ${s.fecha_desincorporacion || ""} ${s.oficio_desincorporacion || ""} ${s.observaciones || ""}`
+            );
+            if (!terms.every(term => haystack.includes(term))) return false;
+        }
+        return true;
+    });
+
+    const filteredStock = filterStockItems(false);
+    const filteredDesinc = filterStockItems(true);
+
+    const assignedHtml = `
+        <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold text-dark mb-0">
+                    <i class="bi bi-pc-display text-danger me-2"></i>Asignados a Módulos y Estaciones
+                </h6>
+                <span class="badge bg-dark">${countRealComponents(filteredAssigned)} equipos</span>
+            </div>
+            ${renderGroupedCardsHtml(filteredAssigned, { showLocation: true })}
+        </div>
+    `;
+
+    const stockBlockHtml = renderStockSectionBlock(filteredStock, {
+        title: `<i class="bi bi-box-seam text-info me-2"></i>Stock / Resguardo`,
+        badgeClass: "bg-info text-dark",
+        headerBg: "bg-light",
+        emptyText: "No hay equipos en Stock / Resguardo con este filtro.",
+        isDesincSection: false
+    });
+
+    const desincBlockHtml = renderStockSectionBlock(filteredDesinc, {
+        title: `<i class="bi bi-archive text-warning me-2"></i>Desincorporados`,
+        badgeClass: "bg-warning text-dark",
+        headerBg: "bg-light",
+        emptyText: "No hay equipos desincorporados con este filtro.",
+        isDesincSection: true
+    });
+
     document.getElementById("adminGroupedComponentsContainer").innerHTML =
-        renderGroupedCardsHtml(filtered, { showLocation: true });
+        assignedHtml + stockBlockHtml + desincBlockHtml;
 }
 
 export function switchOpTab(tab, persistSessionFn) {
