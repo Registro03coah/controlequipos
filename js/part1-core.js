@@ -1,44 +1,94 @@
-import { STATE_DOC_REF, setDoc, onSnapshot } from "../firebase-config.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ==================== CONFIGURACIÓN Y ESTADO (ESQUEMA V2 LIMPIO) ====================
-export const ADMIN_PASS = "admin123";
-export const LOCAL_CACHE_KEY = "macs_inventory_cache_v2";
-export const SESSION_STORAGE_KEY = "macs_active_session_v2";
-export const SCHEMA_VERSION = 2;
-export const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cbd5e1'/><circle cx='50' cy='38' r='18' fill='%2364748b'/><path d='M20 88 C20 65, 80 65, 80 88' fill='%2364748b'/></svg>";
+// ==================== CONFIGURACIÓN FIREBASE Y AUTENTICACIÓN ====================
+const firebaseConfig = {
+    apiKey: "AIzaSyA_REEMPLAZA_CON_TU_API_KEY",
+    authDomain: "TU_PROYECTO.firebaseapp.com",
+    projectId: "TU_PROYECTO",
+    storageBucket: "TU_PROYECTO.appspot.com",
+    messagingSenderId: "000000000000",
+    appId: "1:000000000000:web:000000000000"
+};
+
+const FIRESTORE_DOC_PATH = ["inventario_macs_d03", "estado_global"];
+const LOCAL_CACHE_KEY = "mac_inventario_cache_d03_v1";
+
+export const ADMIN_PASS = "AdminMAC2026*";
+export const DEFAULT_ADMIN_PASS = ADMIN_PASS;
+
+export const DEFAULT_AVATAR = "data:image/svg+xml;utf8," + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <rect width="120" height="120" rx="60" fill="#e2e8f0"/>
+  <circle cx="60" cy="45" r="21" fill="#64748b"/>
+  <path d="M22 104c4-20 20-32 38-32s34 12 38 32" fill="#64748b"/>
+</svg>
+`);
 
 export const DISTRICT_AREAS = [
-    { key: "vrfe", label: "VRFE (Vocal del Registro Federal de Electores)", shortLabel: "VRFE", persons: 1 },
-    { key: "josa", label: "JOSA (Jefe de Oficina y Seguimiento de Analisis)", shortLabel: "JOSA", persons: 1 },
-    { key: "verificador_campo", label: "Verificador de Campo", shortLabel: "Verificador de Campo", persons: 1 },
-    { key: "soporte_tecnico", label: "Soporte Tecnico", shortLabel: "Soporte Tecnico", persons: 1 },
-    { key: "cartografia", label: "Cartografia", shortLabel: "Cartografia", persons: 2 }
+    { key: "vrfe", label: "VRFE (Vocalía del RFE)", shortLabel: "VRFE", defaultSlots: 3, slotPrefix: "Integrante / Puesto" },
+    { key: "josa", label: "JOSA (Junta / Organización)", shortLabel: "JOSA", defaultSlots: 3, slotPrefix: "Integrante / Puesto" },
+    { key: "verificador_campo", label: "Verificador de Campo", shortLabel: "Verificador de Campo", defaultSlots: 4, slotPrefix: "Verificador" },
+    { key: "soporte_tecnico", label: "Soporte Técnico", shortLabel: "Soporte Técnico", defaultSlots: 2, slotPrefix: "Soporte" },
+    { key: "cartografia", label: "Cartografía", shortLabel: "Cartografía", defaultSlots: 3, slotPrefix: "Cartografía" }
 ];
 
+export const MAC_MODULES = ["050351", "050353", "050354"];
+
+// ==================== ESTADO GLOBAL Y MUTADORES ====================
 export const DEFAULT_STATE = {
-    version_esquema: SCHEMA_VERSION,
-    estaciones: { "050351": 8, "050353": 3, "050354": 2 },
-    areas_distritales: {
-        vrfe: 1,
-        josa: 1,
-        verificador_campo: 1,
-        soporte_tecnico: 1,
-        cartografia: 2
+    estaciones: {
+        "050351": 4,
+        "050353": 3,
+        "050354": 3
     },
-    marcas: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Wacom", "Suprema", "Morpho", "Xerox", "Samsung", "Nextep", "ImageTeam", "Syble", "Brother", "Datalogic", "NO APLICA", "Generico"],
+    config_estaciones: {
+        "050351": 4,
+        "050353": 3,
+        "050354": 3
+    },
+    areas_distritales: {
+        vrfe: 3,
+        josa: 3,
+        verificador_campo: 4,
+        soporte_tecnico: 2,
+        cartografia: 3
+    },
+    marcas: [
+        "NO APLICA",
+        "Dell",
+        "HP",
+        "Lenovo",
+        "Canon",
+        "Epson",
+        "Brother",
+        "Cisco",
+        "Yealink",
+        "Grandstream",
+        "Samsung",
+        "Huawei",
+        "Garmin",
+        "Trimble",
+        "Zebra",
+        "Honeywell",
+        "APC",
+        "Generico"
+    ],
     tipos_componente: [
         "Computadora / CPU",
         "Laptop",
-        "Servidor",
         "Monitor",
-        "Camara Fotografica",
-        "Pad de Firmas",
-        "Escaner de Huellas",
-        "Decadactilar",
+        "Teclado",
+        "Mouse",
         "Impresora",
-        "Escaner Digitalizador",
-        "Lector QR / Codigo Barras",
-        "No-Break / UPS"
+        "Escaner / Scanner",
+        "Camara / Biometrico",
+        "Lector de Huella / Firma",
+        "No Break / UPS",
+        "Switch / Red",
+        "Telefono IP",
+        "Tableta",
+        "GPS"
     ],
     operadores: [],
     componentes: [],
@@ -47,47 +97,72 @@ export const DEFAULT_STATE = {
     historial_traspasos: []
 };
 
-export let appState = loadLocalCache();
+export let appState = cloneDefaultState();
 export let currentUser = null;
-export let activeAdminTab = "inventario";
 export let activeOpTab = "equipos";
+
 export let html5QrCode = null;
-export let targetScannerInputId = null;
-
+export let targetScannerInputId = "compSerie";
 export let currentCompPhoto = "";
-export let currentOpPhoto = "";
-export let currentFaultPhoto = "";
 
-export function setCurrentUser(val) { currentUser = val; }
-export function setActiveAdminTab(val) { activeAdminTab = val; }
-export function setActiveOpTab(val) { activeOpTab = val; }
-export function setHtml5QrCode(val) { html5QrCode = val; }
-export function setTargetScannerInputId(val) { targetScannerInputId = val; }
-export function setCurrentCompPhoto(val) { currentCompPhoto = val; }
-export function setCurrentOpPhoto(val) { currentOpPhoto = val; }
-export function setCurrentFaultPhoto(val) { currentFaultPhoto = val; }
-
-// ==================== HELPERS DE TEXTO, ORDEN, ÁREAS Y "NO APLICA" ====================
-export function normalizeText(value = "") {
-    return String(value || "")
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+export function setCurrentUser(val) {
+    currentUser = val;
+    window.currentUser = val;
 }
 
-export function normalizeUnitKey(value = "") {
-    const raw = String(value || "").trim();
-    if (raw === "500351") return "050351";
-    if (/^\d+$/.test(raw)) return raw.padStart(6, "0");
+export function setActiveOpTab(tab) {
+    activeOpTab = tab;
+}
 
-    const clean = normalizeText(raw).replace(/\s+/g, "_");
-    if (clean === "vocal" || clean === "vrfe" || clean.startsWith("vrfe_")) return "vrfe";
-    if (clean === "josa" || clean.startsWith("josa_")) return "josa";
-    if (clean === "tecnico" || clean.includes("verificador")) return "verificador_campo";
-    if (clean === "soporte" || clean.includes("soporte")) return "soporte_tecnico";
-    if (clean.includes("cartograf")) return "cartografia";
-    return clean || "050351";
+export function setHtml5QrCode(scanner) {
+    html5QrCode = scanner;
+}
+
+export function setTargetScannerInputId(id) {
+    targetScannerInputId = id;
+}
+
+export function setCurrentCompPhoto(dataUrl) {
+    currentCompPhoto = dataUrl || "";
+}
+
+function cloneDefaultState() {
+    return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
+// ==================== NORMALIZACIÓN DE TEXTO Y UNIDADES (MAC / ÁREAS) ====================
+export function normalizeText(str) {
+    return String(str || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+}
+
+export function sortAlphaEs(arr) {
+    return [...(arr || [])].sort((a, b) =>
+        String(a || "").localeCompare(String(b || ""), "es", { sensitivity: "base", numeric: true })
+    );
+}
+
+export function normalizeUnitKey(val) {
+    const raw = String(val || "").trim();
+    if (!raw) return "050351";
+    if (raw === "500351") return "050351";
+    if (MAC_MODULES.includes(raw)) return raw;
+
+    const norm = normalizeText(raw).replace(/[\s-]+/g, "_");
+    if (norm === "050351" || norm === "50351" || norm === "500351" || norm.includes("050351")) return "050351";
+    if (norm === "050353" || norm === "50353" || norm.includes("050353")) return "050353";
+    if (norm === "050354" || norm === "050354" || norm.includes("050354")) return "050354";
+
+    if (norm === "vrfe" || norm.includes("vocalia")) return "vrfe";
+    if (norm === "josa" || norm.includes("organizacion")) return "josa";
+    if (norm.includes("verificador") || norm.includes("campo")) return "verificador_campo";
+    if (norm.includes("soporte") || norm.includes("tecnico")) return "soporte_tecnico";
+    if (norm.includes("cartografia")) return "cartografia";
+
+    return raw;
 }
 
 export function isDistrictArea(unitKey) {
@@ -95,501 +170,469 @@ export function isDistrictArea(unitKey) {
     return DISTRICT_AREAS.some(a => a.key === key);
 }
 
-export function getAreaMeta(unitKey) {
+export function getDistrictAreaMeta(unitKey) {
     const key = normalizeUnitKey(unitKey);
     return DISTRICT_AREAS.find(a => a.key === key) || null;
 }
 
 export function formatUnitLabel(unitKey, { short = false } = {}) {
     const key = normalizeUnitKey(unitKey);
-    const area = getAreaMeta(key);
-    if (area) return short ? area.shortLabel : area.label;
+    if (MAC_MODULES.includes(key)) {
+        return short ? `MAC ${key}` : `Módulo ${key}`;
+    }
+    const meta = getDistrictAreaMeta(key);
+    if (meta) {
+        return short ? meta.shortLabel : meta.label;
+    }
     return key;
 }
 
-export function sortAlphaEs(list = []) {
-    return [...list].sort((a, b) => String(a).localeCompare(String(b), "es", { sensitivity: "base" }));
-}
+export function populateUnitSelect(selectEl, { includeAll = false, allLabel = "Todos los Módulos y Áreas" } = {}) {
+    if (!selectEl) return;
+    const prevVal = normalizeUnitKey(selectEl.value || "");
+    const options = [];
 
-export function deduplicateComponentTypes(typesList = [], componentsList = []) {
-    const canonicalByNorm = new Map();
-
-    componentsList.forEach(c => {
-        const rawType = String(c?.tipo_componente || "").trim();
-        const key = normalizeText(rawType);
-        if (key && !canonicalByNorm.has(key)) {
-            canonicalByNorm.set(key, key === "camara fotografica" ? "Camara Fotografica" : rawType);
-        }
-    });
-
-    typesList.forEach(t => {
-        const rawType = String(t || "").trim();
-        const key = normalizeText(rawType);
-        if (key && !canonicalByNorm.has(key)) {
-            canonicalByNorm.set(key, key === "camara fotografica" ? "Camara Fotografica" : rawType);
-        }
-    });
-
-    return sortAlphaEs(Array.from(canonicalByNorm.values()));
-}
-
-export function deduplicateBrands(brandsList = [], componentsList = []) {
-    const canonicalByNorm = new Map();
-
-    componentsList.forEach(c => {
-        if (isNoAplicaComponent(c)) return;
-        const rawBrand = String(c?.marca || "").trim();
-        const key = normalizeText(rawBrand);
-        if (key && !canonicalByNorm.has(key)) {
-            canonicalByNorm.set(key, rawBrand);
-        }
-    });
-
-    brandsList.forEach(b => {
-        const rawBrand = String(b || "").trim();
-        const key = normalizeText(rawBrand);
-        if (key && !canonicalByNorm.has(key)) {
-            canonicalByNorm.set(key, rawBrand);
-        }
-    });
-
-    return sortAlphaEs(Array.from(canonicalByNorm.values()));
-}
-
-export function isNoAplicaComponent(comp) {
-    if (!comp) return false;
-    const estado = String(comp.estado_fisico || comp.estado || "").trim().toLowerCase();
-    const marca = String(comp.marca || "").trim().toUpperCase();
-    const serie = String(comp.numero_serie || comp.serie || "").trim().toUpperCase();
-    return estado === "no aplica" || marca === "NO APLICA" || serie === "NO APLICA" || serie.startsWith("NA-");
-}
-
-export function countRealComponents(list = []) {
-    return list.filter(c => !isNoAplicaComponent(c)).length;
-}
-
-// ==================== MIGRACIÓN A NOMBRES NORMALIZADOS ====================
-export function normalizeComponentRecord(raw = {}) {
-    const estadoRaw = String(raw.estado_fisico ?? raw.estado ?? "Operativo").trim();
-    const marcaRaw = String(raw.marca ?? "Generico").trim();
-    const serieRaw = String(raw.numero_serie ?? raw.serie ?? "").trim().toUpperCase();
-    const isNA =
-        estadoRaw.toLowerCase() === "no aplica" ||
-        marcaRaw.toUpperCase() === "NO APLICA" ||
-        serieRaw === "NO APLICA" ||
-        serieRaw.startsWith("NA-");
-
-    let tipo = String(raw.tipo_componente ?? raw.tipo ?? "Computadora / CPU").trim();
-    if (normalizeText(tipo) === "camara fotografica") tipo = "Camara Fotografica";
-
-    const unitKey = normalizeUnitKey(raw.modulo || "050351");
-    const defaultEst = isDistrictArea(unitKey) ? 1 : 0;
-
-    return {
-        id: String(raw.id || "CMP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
-        modulo: unitKey,
-        estacion: Number(raw.estacion ?? defaultEst),
-        tipo_componente: tipo,
-        marca: isNA ? "NO APLICA" : marcaRaw,
-        modelo: isNA ? "NO APLICA" : String(raw.modelo ?? "").trim(),
-        numero_serie: isNA ? "NO APLICA" : serieRaw,
-        inventario_ine: isNA ? "" : String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
-        serie_cpu_vinculada: isNA ? "" : String(raw.serie_cpu_vinculada ?? raw.serieCpuVinculada ?? "").trim().toUpperCase(),
-        serie_lente: isNA ? "" : String(raw.serie_lente ?? raw.serieLente ?? "").trim().toUpperCase(),
-        serie_docking: isNA ? "" : String(raw.serie_docking ?? raw.serieDocking ?? "").trim().toUpperCase(),
-        estado_fisico: isNA ? "No Aplica" : estadoRaw,
-        observaciones: isNA ? "" : String(raw.observaciones ?? raw.notas ?? "").trim(),
-        foto_url: isNA ? "" : String(raw.foto_url ?? raw.foto ?? ""),
-        registrado_por: String(raw.registrado_por ?? raw.registradoPor ?? "Administrador").trim(),
-        fecha_registro: String(raw.fecha_registro ?? raw.fechaRegistro ?? new Date().toLocaleString("es-MX"))
-    };
-}
-
-export function normalizeStockRecord(raw = {}) {
-    const desincRaw = normalizeText(raw.desincorporacion ?? "No");
-    const oficio = String(raw.oficio_desincorporacion ?? raw.oficioDesincorporacion ?? "").trim().toUpperCase();
-    const fechaDesinc = String(raw.fecha_desincorporacion ?? raw.fechaDesincorporacion ?? "").trim();
-
-    const isDesinc = desincRaw === "si" || Boolean(oficio);
-    const desincorporacion = isDesinc ? "Si" : "No";
-
-    const estRaw = String(raw.estatus ?? "Stock").trim().toLowerCase();
-    let estatus = estRaw === "falla" ? "Falla" : (estRaw === "desincorporado" ? "Desincorporado" : "Stock");
-    if (isDesinc && estatus === "Falla") {
-        estatus = "Desincorporado";
+    if (includeAll) {
+        options.push(`<option value="ALL">${allLabel}</option>`);
     }
 
-    const origenRaw = raw.origen ?? raw.ubicacion ?? "050351";
-    const origen = String(origenRaw).trim().toLowerCase() === "jde03" ? "jde03" : normalizeUnitKey(origenRaw);
+    MAC_MODULES.forEach(m => {
+        options.push(`<option value="${m}">${formatUnitLabel(m)}</option>`);
+    });
 
-    return {
-        id: String(raw.id || "STK-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
-        origen,
-        destino: String(raw.destino ?? "").trim(),
-        inventario_ine: String(raw.inventario_ine ?? raw.inventarioIne ?? "").trim().toUpperCase(),
-        descripcion: String(raw.descripcion ?? raw.tipo_componente ?? "").trim(),
-        marca: String(raw.marca ?? "").trim(),
-        modelo: String(raw.modelo ?? "").trim(),
-        numero_serie: String(raw.numero_serie ?? raw.serie ?? "").trim().toUpperCase(),
-        serie_lente: String(raw.serie_lente ?? raw.lente ?? "").trim().toUpperCase(),
-        estatus,
-        desincorporacion,
-        fecha_desincorporacion: fechaDesinc,
-        oficio_desincorporacion: oficio,
-        observaciones: String(raw.observaciones ?? "").trim(),
-        fecha_registro: String(raw.fecha_registro ?? new Date().toLocaleString("es-MX"))
-    };
+    DISTRICT_AREAS.forEach(area => {
+        options.push(`<option value="${area.key}">${area.label}</option>`);
+    });
+
+    selectEl.innerHTML = options.join("");
+
+    if (includeAll && (selectEl.value === "ALL" || !prevVal)) {
+        selectEl.value = "ALL";
+    } else if (prevVal && [...selectEl.options].some(o => o.value === prevVal)) {
+        selectEl.value = prevVal;
+    } else if (!includeAll && selectEl.options.length > 0) {
+        selectEl.value = selectEl.options[0].value;
+    }
 }
 
-export function normalizeOperatorRecord(raw = {}) {
-    const unitKey = normalizeUnitKey(raw.modulo || "050351");
-    const defaultEst = isDistrictArea(unitKey) ? 1 : 0;
-    return {
-        id: String(raw.id || "OP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
-        modulo: unitKey,
-        estacion: Number(raw.estacion ?? defaultEst),
-        nombre_completo: String(raw.nombre_completo ?? raw.nombre ?? "").trim(),
-        telefono: String(raw.telefono ?? "").trim(),
-        correo_institucional: String(raw.correo_institucional ?? raw.correo ?? "").trim().toLowerCase(),
-        foto_url: String(raw.foto_url ?? raw.foto ?? "")
-    };
+// ==================== ESTACIONES / PUESTOS Y OPERADORES ====================
+export function getConfiguredStationsCount(unitKey) {
+    const key = normalizeUnitKey(unitKey);
+    if (isDistrictArea(key)) {
+        const meta = getDistrictAreaMeta(key);
+        const val = Number(appState.areas_distritales?.[key]);
+        return Number.isFinite(val) && val > 0 ? Math.floor(val) : (meta ? meta.defaultSlots : 2);
+    }
+    const val = Number(appState.estaciones?.[key] ?? appState.config_estaciones?.[key] ?? 0);
+    return Number.isFinite(val) && val >= 0 ? Math.floor(val) : 0;
 }
 
-export function normalizeFaultTicketRecord(raw = {}) {
-    const unitKey = normalizeUnitKey(raw.modulo || "050351");
-    const defaultEst = isDistrictArea(unitKey) ? 1 : 0;
-    return {
-        id: String(raw.id || "FLT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
-        folio_ticket: String(raw.folio_ticket ?? raw.folio ?? "").trim(),
-        fecha_reporte: String(raw.fecha_reporte ?? raw.fecha ?? new Date().toLocaleString("es-MX")),
-        modulo: unitKey,
-        estacion: Number(raw.estacion ?? defaultEst),
-        usuario_nombre: String(raw.usuario_nombre ?? raw.operadorNombre ?? "No asignado").trim(),
-        usuario_telefono: String(raw.usuario_telefono ?? raw.operadorTelefono ?? "N/A").trim(),
-        usuario_correo: String(raw.usuario_correo ?? raw.operadorCorreo ?? "N/A").trim(),
-        componente_id: String(raw.componente_id ?? raw.compId ?? ""),
-        tipo_componente: String(raw.tipo_componente ?? raw.compTipo ?? "").trim(),
-        marca: String(raw.marca ?? raw.compMarca ?? "").trim(),
-        modelo: String(raw.modelo ?? raw.compModelo ?? "").trim(),
-        numero_serie: String(raw.numero_serie ?? raw.compSerie ?? "").trim().toUpperCase(),
-        categoria_falla: String(raw.categoria_falla ?? raw.categoria ?? "Otro").trim(),
-        descripcion_falla: String(raw.descripcion_falla ?? raw.descripcion ?? "").trim(),
-        foto_evidencia: String(raw.foto_evidencia ?? raw.foto ?? ""),
-        estatus_ticket: String(raw.estatus_ticket ?? raw.estatus ?? "Ticket Abierto / Pendiente").trim(),
-        fecha_cierre: String(raw.fecha_cierre ?? raw.fechaSolucion ?? ""),
-        tecnico_responsable: String(raw.tecnico_responsable ?? raw.tecnicoSolucion ?? "").trim(),
-        tipo_solucion: String(raw.tipo_solucion ?? raw.tipoSolucion ?? "").trim(),
-        notas_seguimiento: String(raw.notas_seguimiento ?? raw.notasSolucion ?? "").trim()
-    };
+export function getTotalConfiguredStations() {
+    const macTotal = MAC_MODULES.reduce((acc, m) => acc + 1 + getConfiguredStationsCount(m), 0);
+    const areaTotal = DISTRICT_AREAS.reduce((acc, a) => acc + Math.max(1, getConfiguredStationsCount(a.key)), 0);
+    return macTotal + areaTotal;
 }
 
-export function migrateStateToV2(raw = {}) {
-    const estacionesRaw = raw.estaciones || raw.stations || DEFAULT_STATE.estaciones;
-    const areasRaw = raw.areas_distritales || DEFAULT_STATE.areas_distritales;
-    const marcasRaw = raw.marcas || raw.brands || DEFAULT_STATE.marcas;
-    const tiposRaw = raw.tipos_componente || raw.types || DEFAULT_STATE.tipos_componente;
-    const operadoresRaw = raw.operadores || raw.operators || [];
-    const componentesRaw = raw.componentes || raw.components || [];
-    const stockRaw = raw.stock_resguardo || raw.stock || [];
-    const ticketsRaw = raw.tickets_fallas || raw.faults || [];
-    const transfersRaw = raw.historial_traspasos || [];
+export function formatStationLabel(estacion, includeRoleHint = false, unitKey = "") {
+    const estNum = Number(estacion);
+    const key = normalizeUnitKey(unitKey);
+    const areaMeta = getDistrictAreaMeta(key);
 
-    const normalizedComponents = Array.isArray(componentesRaw) ? componentesRaw.map(normalizeComponentRecord) : [];
-    const cleanBrands = deduplicateBrands(Array.isArray(marcasRaw) && marcasRaw.length ? marcasRaw : DEFAULT_STATE.marcas, normalizedComponents);
-    const cleanTypes = deduplicateComponentTypes(Array.isArray(tiposRaw) && tiposRaw.length ? tiposRaw : DEFAULT_STATE.tipos_componente, normalizedComponents);
+    if (areaMeta) {
+        const slotNum = estNum <= 0 ? 1 : estNum;
+        const base = `${areaMeta.shortLabel} • ${areaMeta.slotPrefix} ${slotNum}`;
+        if (!includeRoleHint) return base;
+        const op = getOperatorByStation(key, slotNum);
+        return op ? `${base} (${op.nombre_completo})` : base;
+    }
 
-    const hasLegacyStockFields = Array.isArray(stockRaw) && stockRaw.some(s =>
-        String(s?.ubicacion || "").trim() === "500351" ||
-        (s && Object.prototype.hasOwnProperty.call(s, "ubicacion") && !Object.prototype.hasOwnProperty.call(s, "origen"))
+    if (estNum === 0) {
+        return includeRoleHint ? "Estación 0 • Servidor / Resp. Módulo" : "Estación 0 • Servidor";
+    }
+    const base = `Estación ${estNum}`;
+    if (!includeRoleHint) return base;
+    const op = getOperatorByStation(key, estNum);
+    return op ? `${base} (${op.nombre_completo})` : base;
+}
+
+export function fillStationOptions(selectEl, unitKey, { includeRoleHint = false, selectedValue = null } = {}) {
+    if (!selectEl) return;
+    const key = normalizeUnitKey(unitKey);
+    const count = getConfiguredStationsCount(key);
+    const options = [];
+
+    if (isDistrictArea(key)) {
+        const totalSlots = Math.max(1, count);
+        for (let i = 1; i <= totalSlots; i++) {
+            const label = formatStationLabel(i, includeRoleHint, key);
+            options.push(`<option value="${i}">${label}</option>`);
+        }
+    } else {
+        options.push(`<option value="0">${formatStationLabel(0, includeRoleHint, key)}</option>`);
+        for (let i = 1; i <= count; i++) {
+            options.push(`<option value="${i}">${formatStationLabel(i, includeRoleHint, key)}</option>`);
+        }
+    }
+
+    selectEl.innerHTML = options.join("");
+
+    const targetVal = selectedValue !== null && selectedValue !== undefined
+        ? String(Number(selectedValue))
+        : (isDistrictArea(key) ? "1" : "0");
+
+    if ([...selectEl.options].some(o => o.value === targetVal)) {
+        selectEl.value = targetVal;
+    } else if (selectEl.options.length > 0) {
+        selectEl.value = selectEl.options[0].value;
+    }
+}
+
+export function getOperatorByStation(unitKey, estacion) {
+    const key = normalizeUnitKey(unitKey);
+    const estNum = Number(estacion);
+    return (appState.operadores || []).find(
+        op => normalizeUnitKey(op.modulo) === key && Number(op.estacion) === estNum
+    ) || null;
+}
+
+// ==================== COMPONENTES, ÍCONOS Y NORMALIZACIÓN ====================
+export function isNoAplicaComponent(comp) {
+    if (!comp) return false;
+    const marca = normalizeText(comp.marca);
+    const modelo = normalizeText(comp.modelo);
+    const serie = String(comp.numero_serie || "").trim().toUpperCase();
+    const estado = normalizeText(comp.estado_fisico);
+    return (
+        marca === "no aplica" ||
+        estado === "no aplica" ||
+        serie === "NO APLICA" ||
+        serie.startsWith("NA-") ||
+        (marca === "no aplica" && modelo === "no aplica")
     );
-
-    const needsCloudSync =
-        Number(raw.version_esquema || 0) !== SCHEMA_VERSION ||
-        Boolean(raw.stations || raw.brands || raw.types || raw.operators || raw.components || raw.faults) ||
-        !raw.areas_distritales ||
-        hasLegacyStockFields ||
-        JSON.stringify(marcasRaw) !== JSON.stringify(cleanBrands) ||
-        JSON.stringify(tiposRaw) !== JSON.stringify(cleanTypes);
-
-    const migratedState = {
-        version_esquema: SCHEMA_VERSION,
-        estaciones: {
-            "050351": Math.max(0, Number(estacionesRaw["050351"] ?? 8)),
-            "050353": Math.max(0, Number(estacionesRaw["050353"] ?? 3)),
-            "050354": Math.max(0, Number(estacionesRaw["050354"] ?? 2))
-        },
-        areas_distritales: {
-            vrfe: Math.max(1, Number(areasRaw.vrfe ?? 1)),
-            josa: Math.max(1, Number(areasRaw.josa ?? 1)),
-            verificador_campo: Math.max(1, Number(areasRaw.verificador_campo ?? 1)),
-            soporte_tecnico: Math.max(1, Number(areasRaw.soporte_tecnico ?? 1)),
-            cartografia: Math.max(2, Number(areasRaw.cartografia ?? 2))
-        },
-        marcas: cleanBrands,
-        tipos_componente: cleanTypes,
-        operadores: Array.isArray(operadoresRaw) ? operadoresRaw.map(normalizeOperatorRecord) : [],
-        componentes: normalizedComponents,
-        stock_resguardo: Array.isArray(stockRaw) ? stockRaw.map(normalizeStockRecord) : [],
-        tickets_fallas: Array.isArray(ticketsRaw) ? ticketsRaw.map(normalizeFaultTicketRecord) : [],
-        historial_traspasos: Array.isArray(transfersRaw) ? transfersRaw : []
-    };
-
-    return { migratedState, needsCloudSync };
 }
 
-// ==================== ÍCONOS, ESTACIONES/PUESTOS Y VINCULACIONES ====================
-export function getComponentIcon(tipo) {
-    const t = normalizeText(tipo);
-    if (t.includes("laptop") || t.includes("portatil")) return "bi-laptop";
-    if (t.includes("servidor") || t.includes("rack")) return "bi-hdd-rack-fill";
-    if (t.includes("computadora") || t.includes("cpu") || t.includes("pc")) return "bi-pc-display";
-    if (t.includes("monitor") || t.includes("pantalla")) return "bi-display";
-    if (t.includes("camara") || t.includes("fotograf") || t.includes("digital")) return "bi-camera-fill";
-    if (t.includes("firma") || t.includes("wacom") || t.includes("pad")) return "bi-pen-fill";
-    if (t.includes("huella") || t.includes("dactilar") || t.includes("decadactilar") || t.includes("biometr")) return "bi-fingerprint";
-    if (t.includes("impresora")) return "bi-printer-fill";
-    if (t.includes("qr") || t.includes("codigo") || t.includes("lector")) return "bi-upc-scan";
-    if (t.includes("escaner") || t.includes("digitalizador") || t.includes("cama")) return "bi-file-earmark-ruled-fill";
-    if (t.includes("break") || t.includes("ups") || t.includes("energia")) return "bi-battery-charging";
-    return "bi-cpu-fill";
+export function countRealComponents(list) {
+    return (list || []).filter(c => !isNoAplicaComponent(c)).length;
 }
 
 export function isMonitorType(tipo) {
     const t = normalizeText(tipo);
-    return t.includes("monitor") || t.includes("pantalla");
+    return t.includes("monitor") || t.includes("pantalla") || t.includes("display");
 }
 
 export function isCpuType(tipo) {
     const t = normalizeText(tipo);
-    return t.includes("computadora") || t.includes("cpu") || t.includes("pc") || t.includes("servidor") || t.includes("laptop");
+    return t.includes("cpu") || t.includes("computadora") || t.includes("escritorio") || t.includes("desktop") || t.includes("servidor");
 }
 
 export function isCameraType(tipo) {
-    return normalizeText(tipo).includes("camara");
+    const t = normalizeText(tipo);
+    return t.includes("camara") || t.includes("biometrico") || t.includes("foto");
 }
 
 export function isLaptopType(tipo) {
     const t = normalizeText(tipo);
-    return t.includes("laptop") || t.includes("portatil");
+    return t.includes("laptop") || t.includes("portatil") || t.includes("notebook");
 }
 
-export function getAvailableCpusForStation(modulo, estacion) {
-    const unitKey = normalizeUnitKey(modulo);
-    return appState.componentes.filter(c =>
-        !isNoAplicaComponent(c) &&
-        normalizeUnitKey(c.modulo) === unitKey &&
-        Number(c.estacion) === Number(estacion) &&
-        isCpuType(c.tipo_componente)
+export function getAvailableCpusForStation(unitKey, estacion) {
+    const key = normalizeUnitKey(unitKey);
+    const estNum = Number(estacion);
+    return (appState.componentes || []).filter(
+        c => !isNoAplicaComponent(c) &&
+             normalizeUnitKey(c.modulo) === key &&
+             Number(c.estacion) === estNum &&
+             isCpuType(c.tipo_componente)
     );
 }
 
-export function formatStationLabel(estacion, includeRoleHint = false, modulo = null) {
-    const num = Number(estacion);
-    if (modulo && isDistrictArea(modulo)) {
-        const count = Math.max(1, Number(appState.areas_distritales?.[normalizeUnitKey(modulo)] ?? 1));
-        return count > 1 ? `Persona ${num}` : `Persona ${num} (Unica)`;
-    }
-    if (num === 0) {
-        return includeRoleHint ? "Estacion 0 - Servidor (Responsable de Modulo)" : "Estacion 0 (Servidor)";
-    }
-    return `Estacion ${num}`;
+export function getComponentIcon(tipo) {
+    const t = normalizeText(tipo);
+    if (t.includes("telefono") || t.includes("ip") || t.includes("voip") || t.includes("celular")) return "bi-telephone-fill";
+    if (t.includes("tableta") || t.includes("tablet") || t.includes("ipad")) return "bi-tablet-landscape-fill";
+    if (t.includes("gps") || t.includes("ubicacion") || t.includes("rastreo") || t.includes("geolocal")) return "bi-geo-alt-fill";
+    if (t.includes("laptop") || t.includes("portatil") || t.includes("notebook")) return "bi-laptop";
+    if (t.includes("monitor") || t.includes("pantalla") || t.includes("display")) return "bi-display";
+    if (t.includes("teclado") || t.includes("keyboard")) return "bi-keyboard-fill";
+    if (t.includes("mouse") || t.includes("raton")) return "bi-mouse2-fill";
+    if (t.includes("impresora") || t.includes("printer")) return "bi-printer-fill";
+    if (t.includes("escaner") || t.includes("scanner") || t.includes("escan")) return "bi-upc-scan";
+    if (t.includes("camara") || t.includes("biometrico") || t.includes("foto")) return "bi-camera-fill";
+    if (t.includes("huella") || t.includes("firma") || t.includes("lector")) return "bi-fingerprint";
+    if (t.includes("no break") || t.includes("ups") || t.includes("energia") || t.includes("regulador")) return "bi-battery-charging";
+    if (t.includes("switch") || t.includes("red") || t.includes("router") || t.includes("modem")) return "bi-hdd-network-fill";
+    if (t.includes("servidor")) return "bi-server";
+    return "bi-cpu-fill";
 }
 
-export function getOperatorByStation(modulo, estacion) {
-    const unitKey = normalizeUnitKey(modulo);
-    return appState.operadores.find(op => normalizeUnitKey(op.modulo) === unitKey && Number(op.estacion) === Number(estacion));
+export function normalizeComponentRecord(rec) {
+    const modulo = normalizeUnitKey(rec.modulo);
+    const estacion = Number.isFinite(Number(rec.estacion)) ? Number(rec.estacion) : (isDistrictArea(modulo) ? 1 : 0);
+    const isNA = isNoAplicaComponent(rec);
+
+    if (isNA) {
+        return {
+            id: rec.id || ("CMP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
+            modulo,
+            estacion,
+            tipo_componente: rec.tipo_componente || "Computadora / CPU",
+            marca: "NO APLICA",
+            modelo: "NO APLICA",
+            numero_serie: "NO APLICA",
+            inventario_ine: "",
+            serie_cpu_vinculada: "",
+            serie_lente: "",
+            serie_docking: "",
+            estado_fisico: "No Aplica",
+            observaciones: "",
+            foto_url: "",
+            registrado_por: rec.registrado_por || "Sistema",
+            fecha_registro: rec.fecha_registro || new Date().toLocaleString("es-MX")
+        };
+    }
+
+    return {
+        id: rec.id || ("CMP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
+        modulo,
+        estacion,
+        tipo_componente: rec.tipo_componente || "Computadora / CPU",
+        marca: rec.marca || "Generico",
+        modelo: rec.modelo || "N/A",
+        numero_serie: String(rec.numero_serie || "").trim().toUpperCase(),
+        inventario_ine: String(rec.inventario_ine || "").trim().toUpperCase(),
+        serie_cpu_vinculada: String(rec.serie_cpu_vinculada || "").trim().toUpperCase(),
+        serie_lente: String(rec.serie_lente || "").trim().toUpperCase(),
+        serie_docking: String(rec.serie_docking || "").trim().toUpperCase(),
+        estado_fisico: rec.estado_fisico || "Operativo",
+        observaciones: rec.observaciones || "",
+        foto_url: rec.foto_url || "",
+        registrado_por: rec.registrado_por || "Administrador",
+        fecha_registro: rec.fecha_registro || new Date().toLocaleString("es-MX")
+    };
 }
 
-export function fillStationOptions(selectEl, modulo, options = {}) {
-    const { onlyUserName = false, includeRoleHint = false, selectedValue = null } = options;
-    const unitKey = normalizeUnitKey(modulo);
-    selectEl.innerHTML = "";
+export function normalizeStockRecord(rec) {
+    const origen = normalizeUnitKey(rec.origen || "050351");
+    const oficio = String(rec.oficio_desincorporacion || "").trim().toUpperCase();
+    const isDesinc =
+        rec.desincorporacion === "Si" ||
+        rec.estatus === "Desincorporado" ||
+        Boolean(oficio);
 
-    if (isDistrictArea(unitKey)) {
-        const areaMeta = getAreaMeta(unitKey);
-        const count = Math.max(1, Number(appState.areas_distritales?.[unitKey] ?? areaMeta?.persons ?? 1));
-
-        for (let i = 1; i <= count; i++) {
-            let label = formatStationLabel(i, includeRoleHint, unitKey);
-            if (onlyUserName) {
-                const op = getOperatorByStation(unitKey, i);
-                label = op ? `${op.nombre_completo} (${formatStationLabel(i, false, unitKey)})` : `Sin asignar (${formatStationLabel(i, false, unitKey)})`;
-            }
-            selectEl.innerHTML += `<option value="${i}">${label}</option>`;
-        }
-
-        const numericSelected = Number(selectedValue);
-        if (selectedValue !== null && !Number.isNaN(numericSelected) && numericSelected >= 1 && numericSelected <= count) {
-            selectEl.value = String(numericSelected);
-        } else {
-            selectEl.value = "1";
-        }
-        return;
-    }
-
-    const rawCount = appState.estaciones[unitKey];
-    const count = Math.max(0, Number(rawCount !== undefined && rawCount !== null ? rawCount : 0));
-
-    for (let i = 0; i <= count; i++) {
-        let label = formatStationLabel(i, includeRoleHint, unitKey);
-        if (onlyUserName) {
-            const op = getOperatorByStation(unitKey, i);
-            label = op ? op.nombre_completo : "Sin asignar";
-        }
-        selectEl.innerHTML += `<option value="${i}">${label}</option>`;
-    }
-
-    const numericSelected = Number(selectedValue);
-    if (selectedValue !== null && !Number.isNaN(numericSelected) && numericSelected >= 0 && numericSelected <= count) {
-        selectEl.value = String(numericSelected);
-    } else {
-        selectEl.value = "0";
-    }
+    return {
+        id: rec.id || ("STK-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
+        origen,
+        destino: rec.destino || "",
+        inventario_ine: String(rec.inventario_ine || "").trim().toUpperCase(),
+        descripcion: rec.descripcion || "Equipo",
+        marca: rec.marca || "Generico",
+        modelo: rec.modelo || "N/A",
+        numero_serie: String(rec.numero_serie || "").trim().toUpperCase(),
+        serie_lente: String(rec.serie_lente || "").trim().toUpperCase(),
+        estatus: isDesinc ? "Desincorporado" : (rec.estatus || "Stock"),
+        desincorporacion: isDesinc ? "Si" : "No",
+        fecha_desincorporacion: rec.fecha_desincorporacion || "",
+        oficio_desincorporacion: oficio,
+        observaciones: rec.observaciones || "",
+        fecha_registro: rec.fecha_registro || new Date().toLocaleString("es-MX")
+    };
 }
 
-export function populateUnitSelect(selectEl, { includeAll = false, allLabel = "Todos los Modulos y Areas" } = {}) {
-    if (!selectEl) return;
-    const prev = selectEl.value;
-    const macsHtml = `
-        <optgroup label="Modulos (MAC)">
-            <option value="050351">Modulo 050351</option>
-            <option value="050353">Modulo 050353</option>
-            <option value="050354">Modulo 050354</option>
-        </optgroup>
-    `;
-    const areasHtml = `
-        <optgroup label="Areas Distritales">
-            ${DISTRICT_AREAS.map(a => `<option value="${a.key}">${a.label}</option>`).join("")}
-        </optgroup>
-    `;
-    selectEl.innerHTML = (includeAll ? `<option value="ALL">${allLabel}</option>` : "") + macsHtml + areasHtml;
-    if (prev && [...selectEl.options].some(o => o.value === prev)) {
-        selectEl.value = prev;
-    }
+function hydrateState(raw) {
+    const base = cloneDefaultState();
+    const src = raw && typeof raw === "object" ? raw : {};
+
+    const estSrc = src.estaciones || src.config_estaciones || {};
+    MAC_MODULES.forEach(m => {
+        const val = Number(estSrc[m]);
+        base.estaciones[m] = Number.isFinite(val) && val >= 0 ? Math.floor(val) : base.estaciones[m];
+    });
+    base.config_estaciones = { ...base.estaciones };
+
+    const areaSrc = src.areas_distritales || {};
+    DISTRICT_AREAS.forEach(a => {
+        const val = Number(areaSrc[a.key]);
+        base.areas_distritales[a.key] = Number.isFinite(val) && val > 0 ? Math.floor(val) : a.defaultSlots;
+    });
+
+    const marcasMerged = Array.from(new Set([...base.marcas, ...(Array.isArray(src.marcas) ? src.marcas : [])])).filter(Boolean);
+    const tiposMerged = Array.from(new Set([...base.tipos_componente, ...(Array.isArray(src.tipos_componente) ? src.tipos_componente : [])])).filter(Boolean);
+
+    base.marcas = marcasMerged;
+    base.tipos_componente = tiposMerged;
+
+    base.operadores = (Array.isArray(src.operadores) ? src.operadores : []).map(op => ({
+        ...op,
+        modulo: normalizeUnitKey(op.modulo),
+        estacion: Number(op.estacion)
+    }));
+
+    base.componentes = (Array.isArray(src.componentes) ? src.componentes : []).map(normalizeComponentRecord);
+    base.stock_resguardo = (Array.isArray(src.stock_resguardo) ? src.stock_resguardo : []).map(normalizeStockRecord);
+    base.tickets_fallas = (Array.isArray(src.tickets_fallas) ? src.tickets_fallas : []).map(f => ({
+        ...f,
+        modulo: normalizeUnitKey(f.modulo),
+        estacion: Number(f.estacion),
+        usuario_nombre: f.usuario_nombre || f.operador_nombre || "Usuario",
+        usuario_correo: f.usuario_correo || f.operador_correo || "",
+        tecnico_responsable: f.tecnico_responsable || f.tecnico_solucion || "",
+        tipo_solucion: f.tipo_solucion || f.accion_solucion || "",
+        notas_seguimiento: f.notas_seguimiento || f.notas_solucion || ""
+    }));
+    base.historial_traspasos = Array.isArray(src.historial_traspasos) ? src.historial_traspasos : [];
+
+    return base;
 }
 
-// ==================== PERSISTENCIA DE SESIÓN Y CACHÉ ====================
-export function persistSession() {
+// ==================== PERSISTENCIA LOCAL Y FIREBASE ====================
+function saveLocalCache(stateObj) {
     try {
-        if (currentUser) {
-            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-                user: currentUser,
-                adminTab: activeAdminTab,
-                opTab: activeOpTab
-            }));
-        } else {
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
-        }
-    } catch (e) {
-        console.warn("No se pudo guardar sesion:", e);
-    }
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(stateObj));
+    } catch (_) {}
 }
 
-export function restoreSession() {
-    try {
-        const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (!raw) return false;
-        const parsed = JSON.parse(raw);
-        if (!parsed || !parsed.user) return false;
-
-        currentUser = parsed.user;
-        activeAdminTab = parsed.adminTab || "inventario";
-        activeOpTab = parsed.opTab || "equipos";
-
-        if (currentUser.role === "operator") {
-            const freshOp = getOperatorByStation(currentUser.modulo, currentUser.estacion);
-            if (freshOp) currentUser.operator = freshOp;
-        }
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-export function loadLocalCache() {
+function loadLocalCache() {
     try {
         const raw = localStorage.getItem(LOCAL_CACHE_KEY);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            return migrateStateToV2(parsed).migratedState;
-        }
-    } catch (e) {
-        console.warn("Error leyendo cache local:", e);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (_) {
+        return null;
     }
-    return JSON.parse(JSON.stringify(DEFAULT_STATE));
 }
 
-export function updateCloudBadge(status) {
-    const loginBadge = document.getElementById("loginSyncBadge");
-    const appBadge = document.getElementById("cloudStatusBadge");
-    if (status === "connected") {
-        if (loginBadge) {
-            loginBadge.className = "badge bg-success text-white";
-            loginBadge.innerHTML = `<i class="bi bi-cloud-fill me-1"></i>En Linea`;
-        }
-        if (appBadge) {
-            appBadge.className = "badge bg-success text-white py-2 px-2";
-            appBadge.innerHTML = `<i class="bi bi-cloud-fill me-1"></i>En Linea`;
-        }
-    } else if (status === "saving") {
-        if (appBadge) {
-            appBadge.className = "badge bg-info text-dark py-2 px-2";
-            appBadge.innerHTML = `<i class="bi bi-cloud-arrow-up-fill me-1"></i>Sincronizando...`;
-        }
-    } else {
-        if (loginBadge) {
-            loginBadge.className = "badge bg-warning text-dark";
-            loginBadge.innerHTML = `<i class="bi bi-cloud-slash-fill me-1"></i>Sin Conexion`;
-        }
-        if (appBadge) {
-            appBadge.className = "badge bg-warning text-dark py-2 px-2";
-            appBadge.innerHTML = `<i class="bi bi-cloud-slash-fill me-1"></i>Sin Conexion`;
-        }
+let db = null;
+let stateDocRef = null;
+let isApplyingRemoteSnapshot = false;
+
+function hasValidFirebaseConfig() {
+    return (
+        firebaseConfig.apiKey &&
+        !firebaseConfig.apiKey.includes("REEMPLAZA") &&
+        firebaseConfig.projectId &&
+        firebaseConfig.projectId !== "TU_PROYECTO"
+    );
+}
+
+function getFirestoreDocRef() {
+    if (!hasValidFirebaseConfig()) return null;
+    if (!db) {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
     }
+    if (!stateDocRef) {
+        stateDocRef = doc(db, FIRESTORE_DOC_PATH[0], FIRESTORE_DOC_PATH[1]);
+    }
+    return stateDocRef;
+}
+
+function updateSyncBadges(mode, labelText) {
+    const badgeIds = ["loginSyncBadge", "cloudStatusBadge"];
+    badgeIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (mode === "online") {
+            el.className = "badge bg-success py-2 px-2";
+            el.innerHTML = `<i class="bi bi-cloud-check-fill me-1"></i>${labelText || "Nube Activa"}`;
+        } else if (mode === "saving") {
+            el.className = "badge bg-warning text-dark py-2 px-2";
+            el.innerHTML = `<i class="bi bi-cloud-arrow-up-fill me-1"></i>${labelText || "Guardando..."}`;
+        } else {
+            el.className = "badge bg-secondary py-2 px-2";
+            el.innerHTML = `<i class="bi bi-hdd-network me-1"></i>${labelText || "Modo Local"}`;
+        }
+    });
 }
 
 export async function saveState() {
-    const cleanState = migrateStateToV2(appState).migratedState;
-    appState = cleanState;
-    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(cleanState));
-    updateCloudBadge("saving");
+    appState.config_estaciones = { ...appState.estaciones };
+    saveLocalCache(appState);
+
+    if (isApplyingRemoteSnapshot) return;
+
+    const ref = getFirestoreDocRef();
+    if (!ref) {
+        updateSyncBadges("local", "Modo Local");
+        return;
+    }
+
     try {
-        await setDoc(STATE_DOC_REF, {
-            ...cleanState,
-            fecha_actualizacion: new Date().toISOString()
+        updateSyncBadges("saving", "Guardando...");
+        await setDoc(ref, {
+            ...appState,
+            updated_at: new Date().toISOString()
         });
-        updateCloudBadge("connected");
+        updateSyncBadges("online", "Nube Sincronizada");
     } catch (err) {
-        console.error("Error guardando en Firestore:", err);
-        updateCloudBadge("offline");
+        console.warn("Error al guardar en Firestore, conservado en caché local:", err);
+        updateSyncBadges("local", "Caché Local");
     }
 }
 
-export function initFirebaseRealtimeListener(onSyncCallback) {
-    onSnapshot(STATE_DOC_REF, async (docSnap) => {
-        if (docSnap.exists()) {
-            const rawData = docSnap.data();
-            const { migratedState, needsCloudSync } = migrateStateToV2(rawData);
-            appState = migratedState;
-            localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(appState));
+export function initFirebaseRealtimeListener(onStateChange) {
+    const cached = loadLocalCache();
+    if (cached) {
+        appState = hydrateState(cached);
+        if (typeof onStateChange === "function") onStateChange();
+    }
 
-            if (needsCloudSync) {
-                try {
-                    await setDoc(STATE_DOC_REF, {
+    const ref = getFirestoreDocRef();
+    if (!ref) {
+        updateSyncBadges("local", "Modo Local");
+        if (!cached && typeof onStateChange === "function") onStateChange();
+        return;
+    }
+
+    updateSyncBadges("local", "Conectando...");
+
+    onSnapshot(
+        ref,
+        async (snap) => {
+            isApplyingRemoteSnapshot = true;
+            try {
+                if (snap.exists()) {
+                    const remoteData = snap.data();
+                    appState = hydrateState(remoteData);
+                    saveLocalCache(appState);
+                    updateSyncBadges("online", "Nube Activa");
+                } else {
+                    const initial = hydrateState(cached || DEFAULT_STATE);
+                    appState = initial;
+                    saveLocalCache(appState);
+                    await setDoc(ref, {
                         ...appState,
-                        fecha_actualizacion: new Date().toISOString()
+                        updated_at: new Date().toISOString()
                     });
-                } catch (syncErr) {
-                    console.warn("No se pudo sobrescribir esquema migrado en nube:", syncErr);
+                    updateSyncBadges("online", "Nube Inicializada");
                 }
+                if (typeof onStateChange === "function") onStateChange();
+            } catch (err) {
+                console.warn("Error procesando snapshot de Firestore:", err);
+                updateSyncBadges("local", "Caché Local");
+            } finally {
+                isApplyingRemoteSnapshot = false;
             }
-        } else {
-            await saveState();
+        },
+        (err) => {
+            console.warn("Error de conexión en tiempo real con Firestore:", err);
+            updateSyncBadges("local", "Sin Nube (Local)");
+            if (typeof onStateChange === "function") onStateChange();
         }
-        updateCloudBadge("connected");
-        if (typeof onSyncCallback === "function") onSyncCallback();
-    }, (error) => {
-        console.error("Error de suscripcion Firestore:", error);
-        updateCloudBadge("offline");
-    });
+    );
+}
+
+export async function initCloudSync(onStateChange) {
+    initFirebaseRealtimeListener(onStateChange);
+    const ref = getFirestoreDocRef();
+    if (!ref) return;
+    try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+            isApplyingRemoteSnapshot = true;
+            appState = hydrateState(snap.data());
+            saveLocalCache(appState);
+            isApplyingRemoteSnapshot = false;
+            if (typeof onStateChange === "function") onStateChange();
+        }
+    } catch (_) {}
 }
