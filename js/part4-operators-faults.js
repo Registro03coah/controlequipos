@@ -11,6 +11,10 @@ import {
     setCurrentOpPhoto,
     setCurrentFaultPhoto,
     normalizeText,
+    normalizeUnitKey,
+    isDistrictArea,
+    formatUnitLabel,
+    populateUnitSelect,
     sortAlphaEs,
     isNoAplicaComponent,
     countRealComponents,
@@ -57,16 +61,17 @@ export function switchLoginTab(role) {
 }
 
 export function onLoginModuloChange() {
-    const modulo = document.getElementById("loginModulo").value;
+    const modulo = normalizeUnitKey(document.getElementById("loginModulo").value);
+    const defaultSel = isDistrictArea(modulo) ? 1 : 0;
     fillStationOptions(document.getElementById("loginEstacion"), modulo, {
         onlyUserName: true,
-        selectedValue: 0
+        selectedValue: defaultSel
     });
     previewOperatorProfile();
 }
 
 export function previewOperatorProfile() {
-    const modulo = document.getElementById("loginModulo").value;
+    const modulo = normalizeUnitKey(document.getElementById("loginModulo").value);
     const estacion = Number(document.getElementById("loginEstacion").value);
     const op = getOperatorByStation(modulo, estacion);
 
@@ -87,7 +92,7 @@ export function previewOperatorProfile() {
 
 export function loginAsOperator(e) {
     e.preventDefault();
-    const modulo = document.getElementById("loginModulo").value;
+    const modulo = normalizeUnitKey(document.getElementById("loginModulo").value);
     const estacion = Number(document.getElementById("loginEstacion").value);
     const op = getOperatorByStation(modulo, estacion);
 
@@ -129,8 +134,10 @@ export function enterApp({ skipInitialReset = false } = {}) {
     } else {
         document.getElementById("operatorView").classList.remove("d-none");
         document.getElementById("adminView").classList.add("d-none");
-        const estText = Number(currentUser.estacion) === 0 ? "Estacion 0 • Servidor" : `Estacion ${currentUser.estacion}`;
-        document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>${currentUser.modulo} | ${estText}`;
+        const estText = isDistrictArea(currentUser.modulo)
+            ? `${formatUnitLabel(currentUser.modulo, { short: true })} • ${formatStationLabel(currentUser.estacion, false, currentUser.modulo)}`
+            : (Number(currentUser.estacion) === 0 ? "Estacion 0 • Servidor" : `Estacion ${currentUser.estacion}`);
+        document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>${formatUnitLabel(currentUser.modulo, { short: true })} | ${estText}`;
         switchOpTab("equipos", persistSession);
         refreshOperatorUI(openPrintFaultFormat);
     }
@@ -182,8 +189,16 @@ export function refreshAdminUI({ preserveSelection = false } = {}) {
     document.getElementById("cfg-050353").value = appState.estaciones["050353"] ?? 0;
     document.getElementById("cfg-050354").value = appState.estaciones["050354"] ?? 0;
 
-    const opModVal = preserveSelection ? document.getElementById("opRegModulo").value : "050351";
-    const opEstVal = preserveSelection ? document.getElementById("opRegEstacion").value : 0;
+    const opModVal = preserveSelection ? normalizeUnitKey(document.getElementById("opRegModulo").value) : "050351";
+    const opEstVal = preserveSelection ? Number(document.getElementById("opRegEstacion").value) : (isDistrictArea(opModVal) ? 1 : 0);
+
+    populateUnitSelect(document.getElementById("adminFilterModulo"), { includeAll: true });
+    populateUnitSelect(document.getElementById("filterOpModulo"), { includeAll: true });
+    populateUnitSelect(document.getElementById("compModulo"));
+    populateUnitSelect(document.getElementById("opRegModulo"));
+    populateUnitSelect(document.getElementById("assignStockModulo"));
+    populateUnitSelect(document.getElementById("trSourceModulo"), { includeAll: true, allLabel: "Todos los Modulos y Areas" });
+    populateUnitSelect(document.getElementById("trTargetModulo"));
 
     populateFilterDropdown();
 
@@ -201,17 +216,26 @@ export function refreshAdminUI({ preserveSelection = false } = {}) {
 
 // ==================== OPERADORES ====================
 export function onOpRegModuloChange() {
-    const modulo = document.getElementById("opRegModulo").value;
+    const modulo = normalizeUnitKey(document.getElementById("opRegModulo").value);
+    const defaultEst = isDistrictArea(modulo) ? 1 : 0;
     fillStationOptions(document.getElementById("opRegEstacion"), modulo, {
         includeRoleHint: true,
-        selectedValue: 0
+        selectedValue: defaultEst
     });
     updateOpRoleHint();
 }
 
 export function updateOpRoleHint() {
+    const modulo = normalizeUnitKey(document.getElementById("opRegModulo").value);
     const est = Number(document.getElementById("opRegEstacion").value);
     const hint = document.getElementById("opRoleHint");
+
+    if (isDistrictArea(modulo)) {
+        hint.textContent = `Integrante de ${formatUnitLabel(modulo)} (${formatStationLabel(est, false, modulo)})`;
+        hint.className = "text-success";
+        return;
+    }
+
     if (est === 0) {
         hint.textContent = "Responsable de Modulo (Estacion 0 - Servidor)";
         hint.className = "text-primary";
@@ -224,16 +248,16 @@ export function updateOpRoleHint() {
 export async function saveOperator(e) {
     e.preventDefault();
     const editId = document.getElementById("editOpId").value;
-    const modulo = document.getElementById("opRegModulo").value;
+    const modulo = normalizeUnitKey(document.getElementById("opRegModulo").value);
     const estacion = Number(document.getElementById("opRegEstacion").value);
     const nombre_completo = document.getElementById("opRegNombre").value.trim();
     const telefono = document.getElementById("opRegTelefono").value.trim();
     const correo_institucional = document.getElementById("opRegCorreo").value.trim().toLowerCase();
 
-    const existingStationOp = appState.operadores.find(o => o.modulo === modulo && Number(o.estacion) === estacion && o.id !== editId);
+    const existingStationOp = appState.operadores.find(o => normalizeUnitKey(o.modulo) === modulo && Number(o.estacion) === estacion && o.id !== editId);
     if (existingStationOp) {
-        const estText = formatStationLabel(estacion);
-        if (!confirm(`${estText} del ${modulo} ya tiene asignado a ${existingStationOp.nombre_completo}. ¿Deseas reemplazarlo?`)) {
+        const estText = `${formatUnitLabel(modulo, { short: true })} - ${formatStationLabel(estacion, false, modulo)}`;
+        if (!confirm(`${estText} ya tiene asignado a ${existingStationOp.nombre_completo}. ¿Deseas reemplazarlo?`)) {
             return;
         }
         appState.operadores = appState.operadores.filter(o => o.id !== existingStationOp.id);
@@ -272,9 +296,11 @@ export async function saveOperator(e) {
 export function editOperator(id) {
     const op = appState.operadores.find(o => o.id === id);
     if (!op) return;
+    const unitKey = normalizeUnitKey(op.modulo);
+    populateUnitSelect(document.getElementById("opRegModulo"));
     document.getElementById("editOpId").value = op.id;
-    document.getElementById("opRegModulo").value = op.modulo;
-    fillStationOptions(document.getElementById("opRegEstacion"), op.modulo, {
+    document.getElementById("opRegModulo").value = unitKey;
+    fillStationOptions(document.getElementById("opRegEstacion"), unitKey, {
         includeRoleHint: true,
         selectedValue: op.estacion
     });
@@ -296,8 +322,8 @@ export function editOperator(id) {
 }
 
 export function resetOperatorForm({ keepModulo = null, keepEstacion = null } = {}) {
-    const modToKeep = keepModulo ?? document.getElementById("opRegModulo").value;
-    const estToKeep = keepEstacion ?? 0;
+    const modToKeep = normalizeUnitKey(keepModulo ?? document.getElementById("opRegModulo").value);
+    const estToKeep = keepEstacion ?? (isDistrictArea(modToKeep) ? 1 : 0);
 
     document.getElementById("operatorForm").reset();
     document.getElementById("editOpId").value = "";
@@ -307,6 +333,7 @@ export function resetOperatorForm({ keepModulo = null, keepEstacion = null } = {
     document.getElementById("opFormTitle").innerHTML = `<i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable`;
     document.getElementById("btnCancelEditOp").classList.add("d-none");
 
+    populateUnitSelect(document.getElementById("opRegModulo"));
     document.getElementById("opRegModulo").value = modToKeep;
     fillStationOptions(document.getElementById("opRegEstacion"), modToKeep, {
         includeRoleHint: true,
@@ -325,8 +352,8 @@ export async function deleteOperator(id) {
 export function renderOperatorsTable() {
     const filterMod = document.getElementById("filterOpModulo").value;
     const list = appState.operadores
-        .filter(o => filterMod === "ALL" || o.modulo === filterMod)
-        .sort((a, b) => a.modulo.localeCompare(b.modulo) || Number(a.estacion) - Number(b.estacion));
+        .filter(o => filterMod === "ALL" || normalizeUnitKey(o.modulo) === normalizeUnitKey(filterMod))
+        .sort((a, b) => normalizeUnitKey(a.modulo).localeCompare(normalizeUnitKey(b.modulo)) || Number(a.estacion) - Number(b.estacion));
 
     const tbody = document.getElementById("operatorsTableBody");
     if (list.length === 0) {
@@ -335,13 +362,20 @@ export function renderOperatorsTable() {
     }
 
     tbody.innerHTML = list.map(o => {
-        const isServer = Number(o.estacion) === 0;
+        const unitKey = normalizeUnitKey(o.modulo);
+        const areaMode = isDistrictArea(unitKey);
+        const isServer = !areaMode && Number(o.estacion) === 0;
+        const unitBadgeText = formatUnitLabel(unitKey, { short: true });
+        const estBadgeText = areaMode
+            ? formatStationLabel(o.estacion, false, unitKey)
+            : (isServer ? "Est. 0 • Servidor" : `Est. ${o.estacion}`);
+
         return `
         <tr>
             <td><img src="${o.foto_url || DEFAULT_AVATAR}" class="avatar-table" onclick="showPhotoModal('${o.foto_url || DEFAULT_AVATAR}', '${o.nombre_completo}')"></td>
             <td>
-                <span class="badge bg-dark">${o.modulo}</span>
-                <span class="badge ${isServer ? "bg-primary" : "btn-pink"}">${isServer ? "Est. 0 • Servidor" : `Est. ${o.estacion}`}</span>
+                <span class="badge bg-dark">${unitBadgeText}</span>
+                <span class="badge ${areaMode ? "bg-info text-dark" : (isServer ? "bg-primary" : "btn-pink")}">${estBadgeText}</span>
             </td>
             <td class="fw-bold">${o.nombre_completo}${isServer ? `<br><small class="text-primary">Responsable de Modulo</small>` : ""}</td>
             <td>${o.telefono}</td>
@@ -422,7 +456,7 @@ export function openReportFaultModal(compId) {
     document.getElementById("faultCompId").value = comp.id;
     document.getElementById("faultCompInfo").textContent = `${comp.tipo_componente} - ${comp.marca} ${comp.modelo}`;
     document.getElementById("faultCompSerie").textContent = comp.numero_serie;
-    document.getElementById("faultLocationInfo").textContent = `${comp.modulo} | ${formatStationLabel(comp.estacion)} (${op ? op.nombre_completo : "Sin asignar"})`;
+    document.getElementById("faultLocationInfo").textContent = `${formatUnitLabel(comp.modulo, { short: true })} | ${formatStationLabel(comp.estacion, false, comp.modulo)} (${op ? op.nombre_completo : "Sin asignar"})`;
 
     document.getElementById("faultForm").reset();
     document.getElementById("faultPhotoInput").value = "";
@@ -437,16 +471,17 @@ export async function submitFaultReport(e) {
     const comp = appState.componentes.find(c => c.id === compId);
     if (!comp || isNoAplicaComponent(comp)) return;
 
-    const op = getOperatorByStation(comp.modulo, comp.estacion);
+    const unitKey = normalizeUnitKey(comp.modulo);
+    const op = getOperatorByStation(unitKey, comp.estacion);
     const consecutive = String(appState.tickets_fallas.length + 1).padStart(3, "0");
     const year = new Date().getFullYear();
-    const folio_ticket = `TKT-${comp.modulo}-${year}-${consecutive}`;
+    const folio_ticket = `TKT-${unitKey.toUpperCase()}-${year}-${consecutive}`;
 
     const newFault = normalizeFaultTicketRecord({
         id: "FLT-" + Date.now(),
         folio_ticket,
         fecha_reporte: new Date().toLocaleString("es-MX"),
-        modulo: comp.modulo,
+        modulo: unitKey,
         estacion: Number(comp.estacion),
         usuario_nombre: op ? op.nombre_completo : "Administrador / No asignado",
         usuario_telefono: op ? op.telefono : "N/A",
@@ -529,13 +564,14 @@ export function renderAdminFaultsTable() {
     tbody.innerHTML = appState.tickets_fallas.slice().reverse().map(f => {
         const isSolved = f.estatus_ticket === "Finalizada";
         const compIcon = getComponentIcon(f.tipo_componente);
+        const unitKey = normalizeUnitKey(f.modulo);
         return `
         <tr>
             <td class="fw-bold text-danger font-monospace">
                 <i class="bi bi-ticket-perforated-fill me-1"></i>${f.folio_ticket}
                 <br><small class="text-muted fw-normal">${f.fecha_reporte}</small>
             </td>
-            <td><span class="badge bg-dark">${f.modulo}</span><br><small>${formatStationLabel(f.estacion)}</small></td>
+            <td><span class="badge bg-dark">${formatUnitLabel(unitKey, { short: true })}</span><br><small>${formatStationLabel(f.estacion, false, unitKey)}</small></td>
             <td><strong>${f.usuario_nombre}</strong><br><span class="text-muted">${f.usuario_telefono}</span></td>
             <td><strong><i class="bi ${compIcon} text-danger me-1"></i>${f.tipo_componente}</strong><br><small class="font-monospace">${f.numero_serie}</small></td>
             <td><strong>${f.categoria_falla}:</strong> ${f.descripcion_falla}</td>
@@ -571,6 +607,7 @@ export function openPrintFaultFormat(faultId, mode = "initial") {
     const f = appState.tickets_fallas.find(item => item.id === faultId);
     if (!f) return;
 
+    const unitKey = normalizeUnitKey(f.modulo);
     const isSolvedMode = mode === "solved" && f.estatus_ticket === "Finalizada";
     document.getElementById("printModalHeaderTitle").innerHTML = isSolvedMode
         ? `<i class="bi bi-file-earmark-check-fill text-success me-2"></i>Hoja de Servicio Finalizada`
@@ -601,7 +638,7 @@ export function openPrintFaultFormat(faultId, mode = "initial") {
             <div class="col-4">
                 <div style="border-top: 1px solid #000; margin: 0 10px; padding-top: 4px;">
                     <strong>${f.usuario_nombre}</strong><br>
-                    <small>${Number(f.estacion) === 0 ? "Responsable de Modulo" : "Usuario MAC"} (Firma de Conformidad)</small>
+                    <small>${Number(f.estacion) === 0 && !isDistrictArea(unitKey) ? "Responsable de Modulo" : "Usuario MAC"} (Firma de Conformidad)</small>
                 </div>
             </div>
             <div class="col-4">
@@ -622,7 +659,7 @@ export function openPrintFaultFormat(faultId, mode = "initial") {
             <div class="col-6">
                 <div style="border-top: 1px solid #000; margin: 0 25px; padding-top: 5px;">
                     <strong>${f.usuario_nombre}</strong><br>
-                    <small>Firma (${Number(f.estacion) === 0 ? "Responsable de Modulo" : "Usuario del Modulo MAC"})</small>
+                    <small>Firma (${Number(f.estacion) === 0 && !isDistrictArea(unitKey) ? "Responsable de Modulo" : "Usuario del Modulo MAC"})</small>
                 </div>
             </div>
             <div class="col-6">
@@ -649,8 +686,8 @@ export function openPrintFaultFormat(faultId, mode = "initial") {
         <div class="print-box">
             <div class="print-box-title">1. Datos de Ubicacion y Usuario Responsable</div>
             <div class="row">
-                <div class="col-6"><strong>Modulo:</strong> ${f.modulo}</div>
-                <div class="col-6"><strong>Estacion de Trabajo:</strong> ${formatStationLabel(f.estacion)}</div>
+                <div class="col-6"><strong>Modulo / Area:</strong> ${formatUnitLabel(unitKey, { short: true })}</div>
+                <div class="col-6"><strong>Estacion / Puesto:</strong> ${formatStationLabel(f.estacion, false, unitKey)}</div>
                 <div class="col-12 mt-1"><strong>Usuario:</strong> ${f.usuario_nombre}</div>
                 <div class="col-6 mt-1"><strong>Telefono:</strong> ${f.usuario_telefono}</div>
                 <div class="col-6 mt-1"><strong>Correo Institucional:</strong> ${f.usuario_correo}</div>
