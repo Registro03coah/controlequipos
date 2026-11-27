@@ -669,9 +669,14 @@ export function initFirebaseRealtimeListener(onStateChange) {
                         });
                     if (typeof onStateChange === "function") onStateChange();
                 }
-            } finally {
+           } finally {
                 isApplyingRemoteSnapshot = false;
             }
-            );
+        },
+        (err) => {
+            console.error("Firestore onSnapshot error:", err);
+            updateSyncBadges("local", "Sin Nube (Local)");
+            if (typeof onStateChange === "function") onStateChange();
+        }
+    );
 }
-        
