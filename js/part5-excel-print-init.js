@@ -89,6 +89,8 @@ import {
     submitResolveFault as submitResolveFaultBase,
     renderAdminFaultsTable,
     openPrintFaultFormat,
+    onAreaConfigSelectChange,
+    onAreaSlotsInputChange,
     saveStationCounts,
     renderCatalogs,
     addCatalogItem,
@@ -231,6 +233,7 @@ export function refreshAdminUI({ preserveSelection = false } = {}) {
     document.getElementById("cfg-050351").value = appState.estaciones["050351"] ?? 0;
     document.getElementById("cfg-050353").value = appState.estaciones["050353"] ?? 0;
     document.getElementById("cfg-050354").value = appState.estaciones["050354"] ?? 0;
+    onAreaConfigSelectChange();
 
     populateUnitSelect(document.getElementById("compModulo"));
     document.getElementById("compModulo").value = prevMod;
@@ -382,21 +385,10 @@ export function downloadImportTemplate() {
             "serie_lente": "",
             "serie_docking": "",
             "estado_fisico": "Operativo",
+            "operador": "",
+            "telefono": "",
+            "correo": "",
             "observaciones": "Equipo principal de estacion"
-        },
-        {
-            "modulo": "vrfe",
-            "estacion": 1,
-            "tipo_componente": "Telefono IP",
-            "marca": "Cisco",
-            "modelo": "IP Phone 7841",
-            "numero_serie": "TEL-EJEMPLO-001",
-            "inventario_ine": "INV-002",
-            "serie_cpu_vinculada": "",
-            "serie_lente": "",
-            "serie_docking": "",
-            "estado_fisico": "Operativo",
-            "observaciones": ""
         },
         {
             "modulo": "cartografia",
@@ -405,11 +397,31 @@ export function downloadImportTemplate() {
             "marca": "Samsung",
             "modelo": "Galaxy Tab",
             "numero_serie": "TAB-EJEMPLO-001",
+            "inventario_ine": "INV-002",
+            "serie_cpu_vinculada": "",
+            "serie_lente": "",
+            "serie_docking": "",
+            "estado_fisico": "Operativo",
+            "operador": "Cartografo 1",
+            "telefono": "8660000001",
+            "correo": "cartografo1@ine.mx",
+            "observaciones": ""
+        },
+        {
+            "modulo": "soporte_tecnico",
+            "estacion": 1,
+            "tipo_componente": "Telefono IP",
+            "marca": "Cisco",
+            "modelo": "IP Phone 7841",
+            "numero_serie": "TEL-EJEMPLO-001",
             "inventario_ine": "INV-003",
             "serie_cpu_vinculada": "",
             "serie_lente": "",
             "serie_docking": "",
             "estado_fisico": "Operativo",
+            "operador": "",
+            "telefono": "",
+            "correo": "",
             "observaciones": ""
         }
     ];
@@ -426,6 +438,47 @@ function parseRowValue(row, keys) {
         }
     }
     return "";
+}
+
+function ensureUnitCapacity(modulo, estacion) {
+    if (isDistrictArea(modulo)) {
+        if (!appState.areas_distritales) appState.areas_distritales = {};
+        const actual = Math.max(1, Number(appState.areas_distritales[modulo] || 1));
+        if (estacion > actual) appState.areas_distritales[modulo] = estacion;
+    } else {
+        const actual = Math.max(0, Number(appState.estaciones?.[modulo] || 0));
+        if (estacion > actual) {
+            appState.estaciones[modulo] = estacion;
+            appState.config_estaciones = { ...appState.estaciones };
+        }
+    }
+}
+
+function upsertImportedOperator(modulo, estacion, nombre, telefono, correo) {
+    if (!nombre) return false;
+    if (!Array.isArray(appState.operadores)) appState.operadores = [];
+    const idx = appState.operadores.findIndex(
+        o => normalizeUnitKey(o.modulo) === modulo && Number(o.estacion) === estacion
+    );
+    if (idx !== -1) {
+        appState.operadores[idx] = {
+            ...appState.operadores[idx],
+            nombre_completo: nombre,
+            telefono: telefono || appState.operadores[idx].telefono || "N/A",
+            correo_institucional: (correo || appState.operadores[idx].correo_institucional || "sin.correo@ine.mx").toLowerCase()
+        };
+    } else {
+        appState.operadores.push({
+            id: "OP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+            modulo,
+            estacion,
+            nombre_completo: nombre,
+            telefono: telefono || "N/A",
+            correo_institucional: (correo || "sin.correo@ine.mx").toLowerCase(),
+            foto_url: ""
+        });
+    }
+    return true;
 }
 
 export async function importInventoryExcel(event) {
@@ -449,6 +502,7 @@ export async function importInventoryExcel(event) {
             let added = 0;
             let updated = 0;
             let skipped = 0;
+            let opsUpserted = 0;
 
             const validUnits = ["050351", "050353", "050354", ...DISTRICT_AREAS.map(a => a.key)];
 
@@ -458,8 +512,17 @@ export async function importInventoryExcel(event) {
                 const modulo = validUnits.includes(normalizedMod) ? normalizedMod : "050351";
 
                 const defaultEst = isDistrictArea(modulo) ? 1 : 0;
-                const estRaw = parseRowValue(row, ["estacion", "Estacion", "ESTACION", "estación", "Estación", "persona", "Persona"]);
+                const estRaw = parseRowValue(row, ["estacion", "Estacion", "ESTACION", "estación", "Estación", "puesto", "Puesto", "persona", "Persona"]);
                 const estacion = estRaw === "" ? defaultEst : Math.max(isDistrictArea(modulo) ? 1 : 0, parseInt(estRaw, 10) || defaultEst);
+
+                ensureUnitCapacity(modulo, estacion);
+
+                const opNombre = parseRowValue(row, ["operador", "Operador", "responsable", "Responsable", "nombre", "Nombre", "nombre_completo"]);
+                const opTel = parseRowValue(row, ["telefono", "Telefono", "Teléfono", "tel"]);
+                const opCorreo = parseRowValue(row, ["correo", "Correo", "email", "Email", "correo_institucional"]);
+                if (upsertImportedOperator(modulo, estacion, opNombre, opTel, opCorreo)) {
+                    opsUpserted++;
+                }
 
                 const tipoRaw = parseRowValue(row, ["tipo_componente", "Tipo Componente", "tipo", "Tipo", "COMPONENTES", "Componente"]) || "Computadora / CPU";
                 const matchedType = appState.tipos_componente.find(t => normalizeText(t) === normalizeText(tipoRaw));
@@ -580,7 +643,11 @@ export async function importInventoryExcel(event) {
 
             await saveState();
             refreshAdminUI();
-            alert(`Importacion completada.\n• Nuevos agregados: ${added}\n• Existentes actualizados: ${updated}\n• Omitidos: ${skipped}`);
+            alert(`Importacion completada.
+• Equipos nuevos: ${added}
+• Equipos actualizados: ${updated}
+• Operadores/puestos procesados: ${opsUpserted}
+• Omitidos: ${skipped}`);
         } catch (err) {
             alert("Error al leer el archivo Excel/CSV: " + err.message);
         } finally {
@@ -704,6 +771,8 @@ Object.assign(window, {
     openResolveFaultModal,
     submitResolveFault,
     openPrintFaultFormat,
+    onAreaConfigSelectChange,
+    onAreaSlotsInputChange,
     saveStationCounts,
     addCatalogItem,
     removeCatalogItem,

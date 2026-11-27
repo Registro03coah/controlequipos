@@ -188,6 +188,7 @@ export function refreshAdminUI({ preserveSelection = false } = {}) {
     document.getElementById("cfg-050351").value = appState.estaciones["050351"] ?? 0;
     document.getElementById("cfg-050353").value = appState.estaciones["050353"] ?? 0;
     document.getElementById("cfg-050354").value = appState.estaciones["050354"] ?? 0;
+    onAreaConfigSelectChange();
 
     const opModVal = preserveSelection ? normalizeUnitKey(document.getElementById("opRegModulo").value) : "050351";
     const opEstVal = preserveSelection ? Number(document.getElementById("opRegEstacion").value) : (isDistrictArea(opModVal) ? 1 : 0);
@@ -390,14 +391,54 @@ export function renderOperatorsTable() {
     `}).join("");
 }
 
-// ==================== ESTACIONES Y CATÁLOGOS (ORDEN ALFABÉTICO) ====================
+// ==================== ESTACIONES, ÁREAS Y CATÁLOGOS ====================
+export function onAreaConfigSelectChange() {
+    const sel = document.getElementById("areaConfigSelect");
+    const inp = document.getElementById("areaSlotsInput");
+    const hint = document.getElementById("areaSlotsHint");
+    const badge = document.getElementById("areaSlotsSummaryBadge");
+    if (!sel || !inp) return;
+
+    const key = normalizeUnitKey(sel.value);
+    if (!appState.areas_distritales) appState.areas_distritales = {};
+    const currentVal = Math.max(1, Number(appState.areas_distritales[key] ?? 1));
+    inp.value = currentVal;
+
+    const areaKeys = ["vrfe", "josa", "verificador_campo", "soporte_tecnico", "cartografia"];
+    const resumen = areaKeys
+        .map(k => `${formatUnitLabel(k, { short: true })}: ${Math.max(1, Number(appState.areas_distritales?.[k] ?? 1))}`)
+        .join(" • ");
+
+    if (badge) {
+        const totalAreaSlots = areaKeys.reduce((acc, k) => acc + Math.max(1, Number(appState.areas_distritales?.[k] ?? 1)), 0);
+        badge.textContent = `${totalAreaSlots} puestos`;
+    }
+    if (hint) hint.textContent = resumen;
+}
+
+export function onAreaSlotsInputChange() {
+    const sel = document.getElementById("areaConfigSelect");
+    const inp = document.getElementById("areaSlotsInput");
+    if (!sel || !inp) return;
+
+    const key = normalizeUnitKey(sel.value);
+    const val = Math.max(1, parseInt(inp.value, 10) || 1);
+    inp.value = val;
+
+    if (!appState.areas_distritales) appState.areas_distritales = {};
+    appState.areas_distritales[key] = val;
+    onAreaConfigSelectChange();
+}
+
 export async function saveStationCounts() {
+    onAreaSlotsInputChange();
     appState.estaciones["050351"] = Math.max(0, Number(document.getElementById("cfg-050351").value));
     appState.estaciones["050353"] = Math.max(0, Number(document.getElementById("cfg-050353").value));
     appState.estaciones["050354"] = Math.max(0, Number(document.getElementById("cfg-050354").value));
+    appState.config_estaciones = { ...appState.estaciones };
     await saveState();
     refreshAdminUI({ preserveSelection: true });
-    alert("Estaciones actualizadas correctamente.");
+    alert("Estaciones y puestos por área actualizados correctamente.");
 }
 
 export function renderCatalogs() {
@@ -509,7 +550,8 @@ export async function submitFaultReport(e) {
     if (currentUser.role === "admin") refreshAdminUI({ preserveSelection: true });
     else refreshOperatorUI(openPrintFaultFormat);
 
-    alert(`Ticket de Servicio generado: ${folio_ticket}\nSe ha registrado para seguimiento del Administrador y se abrira la Hoja de Servicio para firmas.`);
+    alert(`Ticket de Servicio generado: ${folio_ticket}
+Se ha registrado para seguimiento del Administrador y se abrira la Hoja de Servicio para firmas.`);
     openPrintFaultFormat(newFault.id, "initial");
 }
 
