@@ -7,9 +7,24 @@ export const SESSION_STORAGE_KEY = "macs_active_session_v2";
 export const SCHEMA_VERSION = 2;
 export const DEFAULT_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23cbd5e1'/><circle cx='50' cy='38' r='18' fill='%2364748b'/><path d='M20 88 C20 65, 80 65, 80 88' fill='%2364748b'/></svg>";
 
+export const DISTRICT_AREAS = [
+    { key: "vrfe", label: "VRFE (Vocal del Registro Federal de Electores)", shortLabel: "VRFE", persons: 1 },
+    { key: "josa", label: "JOSA (Jefe de Oficina y Seguimiento de Analisis)", shortLabel: "JOSA", persons: 1 },
+    { key: "verificador_campo", label: "Verificador de Campo", shortLabel: "Verificador de Campo", persons: 1 },
+    { key: "soporte_tecnico", label: "Soporte Tecnico", shortLabel: "Soporte Tecnico", persons: 1 },
+    { key: "cartografia", label: "Cartografia", shortLabel: "Cartografia", persons: 2 }
+];
+
 export const DEFAULT_STATE = {
     version_esquema: SCHEMA_VERSION,
     estaciones: { "050351": 8, "050353": 3, "050354": 2 },
+    areas_distritales: {
+        vrfe: 1,
+        josa: 1,
+        verificador_campo: 1,
+        soporte_tecnico: 1,
+        cartografia: 2
+    },
     marcas: ["HP", "Dell", "Lenovo", "Epson", "Zebra", "Canon", "Wacom", "Suprema", "Morpho", "Xerox", "Samsung", "Nextep", "ImageTeam", "Syble", "Brother", "Datalogic", "NO APLICA", "Generico"],
     tipos_componente: [
         "Computadora / CPU",
@@ -52,13 +67,44 @@ export function setCurrentCompPhoto(val) { currentCompPhoto = val; }
 export function setCurrentOpPhoto(val) { currentOpPhoto = val; }
 export function setCurrentFaultPhoto(val) { currentFaultPhoto = val; }
 
-// ==================== HELPERS DE TEXTO, ORDEN Y "NO APLICA" ====================
+// ==================== HELPERS DE TEXTO, ORDEN, ÁREAS Y "NO APLICA" ====================
 export function normalizeText(value = "") {
     return String(value || "")
         .trim()
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
+}
+
+export function normalizeUnitKey(value = "") {
+    const raw = String(value || "").trim();
+    if (raw === "500351") return "050351";
+    if (/^\d+$/.test(raw)) return raw.padStart(6, "0");
+
+    const clean = normalizeText(raw).replace(/\s+/g, "_");
+    if (clean === "vocal" || clean === "vrfe" || clean.startsWith("vrfe_")) return "vrfe";
+    if (clean === "josa" || clean.startsWith("josa_")) return "josa";
+    if (clean === "tecnico" || clean.includes("verificador")) return "verificador_campo";
+    if (clean === "soporte" || clean.includes("soporte")) return "soporte_tecnico";
+    if (clean.includes("cartograf")) return "cartografia";
+    return clean || "050351";
+}
+
+export function isDistrictArea(unitKey) {
+    const key = normalizeUnitKey(unitKey);
+    return DISTRICT_AREAS.some(a => a.key === key);
+}
+
+export function getAreaMeta(unitKey) {
+    const key = normalizeUnitKey(unitKey);
+    return DISTRICT_AREAS.find(a => a.key === key) || null;
+}
+
+export function formatUnitLabel(unitKey, { short = false } = {}) {
+    const key = normalizeUnitKey(unitKey);
+    const area = getAreaMeta(key);
+    if (area) return short ? area.shortLabel : area.label;
+    return key;
 }
 
 export function sortAlphaEs(list = []) {
@@ -136,10 +182,13 @@ export function normalizeComponentRecord(raw = {}) {
     let tipo = String(raw.tipo_componente ?? raw.tipo ?? "Computadora / CPU").trim();
     if (normalizeText(tipo) === "camara fotografica") tipo = "Camara Fotografica";
 
+    const unitKey = normalizeUnitKey(raw.modulo || "050351");
+    const defaultEst = isDistrictArea(unitKey) ? 1 : 0;
+
     return {
         id: String(raw.id || "CMP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
-        modulo: String(raw.modulo || "050351").padStart(6, "0"),
-        estacion: Number(raw.estacion ?? 0),
+        modulo: unitKey,
+        estacion: Number(raw.estacion ?? defaultEst),
         tipo_componente: tipo,
         marca: isNA ? "NO APLICA" : marcaRaw,
         modelo: isNA ? "NO APLICA" : String(raw.modelo ?? "").trim(),
@@ -170,8 +219,8 @@ export function normalizeStockRecord(raw = {}) {
         estatus = "Desincorporado";
     }
 
-    let origen = String(raw.origen ?? raw.ubicacion ?? "050351").trim();
-    if (origen === "500351") origen = "050351";
+    const origenRaw = raw.origen ?? raw.ubicacion ?? "050351";
+    const origen = String(origenRaw).trim().toLowerCase() === "jde03" ? "jde03" : normalizeUnitKey(origenRaw);
 
     return {
         id: String(raw.id || "STK-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
@@ -193,10 +242,12 @@ export function normalizeStockRecord(raw = {}) {
 }
 
 export function normalizeOperatorRecord(raw = {}) {
+    const unitKey = normalizeUnitKey(raw.modulo || "050351");
+    const defaultEst = isDistrictArea(unitKey) ? 1 : 0;
     return {
         id: String(raw.id || "OP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
-        modulo: String(raw.modulo || "050351").padStart(6, "0"),
-        estacion: Number(raw.estacion ?? 0),
+        modulo: unitKey,
+        estacion: Number(raw.estacion ?? defaultEst),
         nombre_completo: String(raw.nombre_completo ?? raw.nombre ?? "").trim(),
         telefono: String(raw.telefono ?? "").trim(),
         correo_institucional: String(raw.correo_institucional ?? raw.correo ?? "").trim().toLowerCase(),
@@ -205,12 +256,14 @@ export function normalizeOperatorRecord(raw = {}) {
 }
 
 export function normalizeFaultTicketRecord(raw = {}) {
+    const unitKey = normalizeUnitKey(raw.modulo || "050351");
+    const defaultEst = isDistrictArea(unitKey) ? 1 : 0;
     return {
         id: String(raw.id || "FLT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
         folio_ticket: String(raw.folio_ticket ?? raw.folio ?? "").trim(),
         fecha_reporte: String(raw.fecha_reporte ?? raw.fecha ?? new Date().toLocaleString("es-MX")),
-        modulo: String(raw.modulo || "050351").padStart(6, "0"),
-        estacion: Number(raw.estacion ?? 0),
+        modulo: unitKey,
+        estacion: Number(raw.estacion ?? defaultEst),
         usuario_nombre: String(raw.usuario_nombre ?? raw.operadorNombre ?? "No asignado").trim(),
         usuario_telefono: String(raw.usuario_telefono ?? raw.operadorTelefono ?? "N/A").trim(),
         usuario_correo: String(raw.usuario_correo ?? raw.operadorCorreo ?? "N/A").trim(),
@@ -232,6 +285,7 @@ export function normalizeFaultTicketRecord(raw = {}) {
 
 export function migrateStateToV2(raw = {}) {
     const estacionesRaw = raw.estaciones || raw.stations || DEFAULT_STATE.estaciones;
+    const areasRaw = raw.areas_distritales || DEFAULT_STATE.areas_distritales;
     const marcasRaw = raw.marcas || raw.brands || DEFAULT_STATE.marcas;
     const tiposRaw = raw.tipos_componente || raw.types || DEFAULT_STATE.tipos_componente;
     const operadoresRaw = raw.operadores || raw.operators || [];
@@ -252,6 +306,7 @@ export function migrateStateToV2(raw = {}) {
     const needsCloudSync =
         Number(raw.version_esquema || 0) !== SCHEMA_VERSION ||
         Boolean(raw.stations || raw.brands || raw.types || raw.operators || raw.components || raw.faults) ||
+        !raw.areas_distritales ||
         hasLegacyStockFields ||
         JSON.stringify(marcasRaw) !== JSON.stringify(cleanBrands) ||
         JSON.stringify(tiposRaw) !== JSON.stringify(cleanTypes);
@@ -262,6 +317,13 @@ export function migrateStateToV2(raw = {}) {
             "050351": Math.max(0, Number(estacionesRaw["050351"] ?? 8)),
             "050353": Math.max(0, Number(estacionesRaw["050353"] ?? 3)),
             "050354": Math.max(0, Number(estacionesRaw["050354"] ?? 2))
+        },
+        areas_distritales: {
+            vrfe: Math.max(1, Number(areasRaw.vrfe ?? 1)),
+            josa: Math.max(1, Number(areasRaw.josa ?? 1)),
+            verificador_campo: Math.max(1, Number(areasRaw.verificador_campo ?? 1)),
+            soporte_tecnico: Math.max(1, Number(areasRaw.soporte_tecnico ?? 1)),
+            cartografia: Math.max(2, Number(areasRaw.cartografia ?? 2))
         },
         marcas: cleanBrands,
         tipos_componente: cleanTypes,
@@ -275,7 +337,7 @@ export function migrateStateToV2(raw = {}) {
     return { migratedState, needsCloudSync };
 }
 
-// ==================== ÍCONOS Y VINCULACIONES ====================
+// ==================== ÍCONOS, ESTACIONES/PUESTOS Y VINCULACIONES ====================
 export function getComponentIcon(tipo) {
     const t = normalizeText(tipo);
     if (t.includes("laptop") || t.includes("portatil")) return "bi-laptop";
@@ -312,16 +374,21 @@ export function isLaptopType(tipo) {
 }
 
 export function getAvailableCpusForStation(modulo, estacion) {
+    const unitKey = normalizeUnitKey(modulo);
     return appState.componentes.filter(c =>
         !isNoAplicaComponent(c) &&
-        c.modulo === String(modulo).padStart(6, "0") &&
+        normalizeUnitKey(c.modulo) === unitKey &&
         Number(c.estacion) === Number(estacion) &&
         isCpuType(c.tipo_componente)
     );
 }
 
-export function formatStationLabel(estacion, includeRoleHint = false) {
+export function formatStationLabel(estacion, includeRoleHint = false, modulo = null) {
     const num = Number(estacion);
+    if (modulo && isDistrictArea(modulo)) {
+        const count = Math.max(1, Number(appState.areas_distritales?.[normalizeUnitKey(modulo)] ?? 1));
+        return count > 1 ? `Persona ${num}` : `Persona ${num} (Unica)`;
+    }
     if (num === 0) {
         return includeRoleHint ? "Estacion 0 - Servidor (Responsable de Modulo)" : "Estacion 0 (Servidor)";
     }
@@ -329,29 +396,75 @@ export function formatStationLabel(estacion, includeRoleHint = false) {
 }
 
 export function getOperatorByStation(modulo, estacion) {
-    return appState.operadores.find(op => op.modulo === modulo && Number(op.estacion) === Number(estacion));
+    const unitKey = normalizeUnitKey(modulo);
+    return appState.operadores.find(op => normalizeUnitKey(op.modulo) === unitKey && Number(op.estacion) === Number(estacion));
 }
 
 export function fillStationOptions(selectEl, modulo, options = {}) {
-    const { onlyUserName = false, includeRoleHint = false, selectedValue = 0 } = options;
-    const rawCount = appState.estaciones[modulo];
+    const { onlyUserName = false, includeRoleHint = false, selectedValue = null } = options;
+    const unitKey = normalizeUnitKey(modulo);
+    selectEl.innerHTML = "";
+
+    if (isDistrictArea(unitKey)) {
+        const areaMeta = getAreaMeta(unitKey);
+        const count = Math.max(1, Number(appState.areas_distritales?.[unitKey] ?? areaMeta?.persons ?? 1));
+
+        for (let i = 1; i <= count; i++) {
+            let label = formatStationLabel(i, includeRoleHint, unitKey);
+            if (onlyUserName) {
+                const op = getOperatorByStation(unitKey, i);
+                label = op ? `${op.nombre_completo} (${formatStationLabel(i, false, unitKey)})` : `Sin asignar (${formatStationLabel(i, false, unitKey)})`;
+            }
+            selectEl.innerHTML += `<option value="${i}">${label}</option>`;
+        }
+
+        const numericSelected = Number(selectedValue);
+        if (selectedValue !== null && !Number.isNaN(numericSelected) && numericSelected >= 1 && numericSelected <= count) {
+            selectEl.value = String(numericSelected);
+        } else {
+            selectEl.value = "1";
+        }
+        return;
+    }
+
+    const rawCount = appState.estaciones[unitKey];
     const count = Math.max(0, Number(rawCount !== undefined && rawCount !== null ? rawCount : 0));
 
-    selectEl.innerHTML = "";
     for (let i = 0; i <= count; i++) {
-        let label = formatStationLabel(i, includeRoleHint);
+        let label = formatStationLabel(i, includeRoleHint, unitKey);
         if (onlyUserName) {
-            const op = getOperatorByStation(modulo, i);
+            const op = getOperatorByStation(unitKey, i);
             label = op ? op.nombre_completo : "Sin asignar";
         }
         selectEl.innerHTML += `<option value="${i}">${label}</option>`;
     }
 
     const numericSelected = Number(selectedValue);
-    if (!Number.isNaN(numericSelected) && numericSelected >= 0 && numericSelected <= count) {
+    if (selectedValue !== null && !Number.isNaN(numericSelected) && numericSelected >= 0 && numericSelected <= count) {
         selectEl.value = String(numericSelected);
     } else {
         selectEl.value = "0";
+    }
+}
+
+export function populateUnitSelect(selectEl, { includeAll = false, allLabel = "Todos los Modulos y Areas" } = {}) {
+    if (!selectEl) return;
+    const prev = selectEl.value;
+    const macsHtml = `
+        <optgroup label="Modulos (MAC)">
+            <option value="050351">Modulo 050351</option>
+            <option value="050353">Modulo 050353</option>
+            <option value="050354">Modulo 050354</option>
+        </optgroup>
+    `;
+    const areasHtml = `
+        <optgroup label="Areas Distritales">
+            ${DISTRICT_AREAS.map(a => `<option value="${a.key}">${a.label}</option>`).join("")}
+        </optgroup>
+    `;
+    selectEl.innerHTML = (includeAll ? `<option value="ALL">${allLabel}</option>` : "") + macsHtml + areasHtml;
+    if (prev && [...selectEl.options].some(o => o.value === prev)) {
+        selectEl.value = prev;
     }
 }
 
