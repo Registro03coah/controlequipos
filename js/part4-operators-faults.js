@@ -784,4 +784,3 @@ export function openPrintFaultFormat(faultId, mode = "initial") {
     document.getElementById("printFormatArea").innerHTML = printHtml;
     new bootstrap.Modal(document.getElementById("printModal")).show();
 }
-```[cite: 17]
