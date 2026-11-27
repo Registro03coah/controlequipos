@@ -7,6 +7,8 @@ import {
     targetScannerInputId,
     currentCompPhoto,
     setCurrentCompPhoto,
+    setCurrentOpPhoto,
+    setCurrentFaultPhoto,
     setHtml5QrCode,
     setTargetScannerInputId,
     normalizeText,
@@ -28,25 +30,32 @@ import {
 
 // ==================== UTILIDADES DE IMAGEN, ESTADO Y MODAL DE COMPONENTE ====================
 export function previewImageFile(event, previewDivId, imgId, targetVarName) {
-    const file = event.target.files[0];
+    const file = event?.target?.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(e) {
         const img = new Image();
         img.onload = function() {
             const canvas = document.createElement("canvas");
-            const maxW = 550;
+            const maxW = targetVarName === "currentOpPhoto" ? 280 : 480;
             const scale = Math.min(1, maxW / img.width);
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
             const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const compressed = canvas.toDataURL("image/jpeg", 0.72);
+            const compressed = canvas.toDataURL("image/jpeg", 0.7);
 
             if (targetVarName === "currentCompPhoto") setCurrentCompPhoto(compressed);
+            else if (targetVarName === "currentOpPhoto") setCurrentOpPhoto(compressed);
+            else if (targetVarName === "currentFaultPhoto") setCurrentFaultPhoto(compressed);
 
-            document.getElementById(imgId).src = compressed;
-            document.getElementById(previewDivId).classList.remove("d-none");
+            const hiddenEl = document.getElementById(targetVarName);
+            if (hiddenEl) hiddenEl.value = compressed;
+
+            const imgEl = document.getElementById(imgId);
+            const prevEl = document.getElementById(previewDivId);
+            if (imgEl) imgEl.src = compressed;
+            if (prevEl) prevEl.classList.remove("d-none");
         };
         img.src = e.target.result;
     };
@@ -54,9 +63,17 @@ export function previewImageFile(event, previewDivId, imgId, targetVarName) {
 }
 
 export function clearImageField(inputId, previewDivId, targetVarName) {
-    document.getElementById(inputId).value = "";
-    document.getElementById(previewDivId).classList.add("d-none");
+    const inputEl = document.getElementById(inputId);
+    if (inputEl) inputEl.value = "";
+    const prevEl = document.getElementById(previewDivId);
+    if (prevEl) prevEl.classList.add("d-none");
+
     if (targetVarName === "currentCompPhoto") setCurrentCompPhoto("");
+    else if (targetVarName === "currentOpPhoto") setCurrentOpPhoto("");
+    else if (targetVarName === "currentFaultPhoto") setCurrentFaultPhoto("");
+
+    const hiddenEl = document.getElementById(targetVarName);
+    if (hiddenEl) hiddenEl.value = "";
 }
 
 export function showPhotoModal(src, title) {
