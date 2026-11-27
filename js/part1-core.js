@@ -37,11 +37,11 @@ export const DEFAULT_AVATAR = "data:image/svg+xml;utf8," + encodeURIComponent(`
 `);
 
 export const DISTRICT_AREAS = [
-    { key: "vrfe", label: "VRFE (Vocalía del RFE)", shortLabel: "VRFE", defaultSlots: 3, slotPrefix: "Integrante / Puesto" },
-    { key: "josa", label: "JOSA (Junta / Organización)", shortLabel: "JOSA", defaultSlots: 3, slotPrefix: "Integrante / Puesto" },
-    { key: "verificador_campo", label: "Verificador de Campo", shortLabel: "Verificador de Campo", defaultSlots: 4, slotPrefix: "Verificador" },
-    { key: "soporte_tecnico", label: "Soporte Técnico", shortLabel: "Soporte Técnico", defaultSlots: 2, slotPrefix: "Soporte" },
-    { key: "cartografia", label: "Cartografía", shortLabel: "Cartografía", defaultSlots: 3, slotPrefix: "Cartografía" }
+    { key: "vrfe", label: "VRFE (Vocalía del RFE)", shortLabel: "VRFE", defaultSlots: 1, slotPrefix: "Integrante / Puesto" },
+    { key: "josa", label: "JOSA (Junta / Organización)", shortLabel: "JOSA", defaultSlots: 1, slotPrefix: "Integrante / Puesto" },
+    { key: "verificador_campo", label: "Verificador de Campo", shortLabel: "Verificador de Campo", defaultSlots: 1, slotPrefix: "Verificador" },
+    { key: "soporte_tecnico", label: "Soporte Técnico", shortLabel: "Soporte Técnico", defaultSlots: 1, slotPrefix: "Soporte" },
+    { key: "cartografia", label: "Cartografía", shortLabel: "Cartografía", defaultSlots: 2, slotPrefix: "Cartografía" }
 ];
 
 export const MAC_MODULES = ["050351", "050353", "050354"];
@@ -59,11 +59,11 @@ export const DEFAULT_STATE = {
         "050354": 3
     },
     areas_distritales: {
-        vrfe: 3,
-        josa: 3,
-        verificador_campo: 4,
-        soporte_tecnico: 2,
-        cartografia: 3
+        vrfe: 1,
+        josa: 1,
+        verificador_campo: 1,
+        soporte_tecnico: 1,
+        cartografia: 2
     },
     marcas: [
         "NO APLICA",
@@ -269,7 +269,7 @@ export function getConfiguredStationsCount(unitKey) {
     if (isDistrictArea(key)) {
         const meta = getDistrictAreaMeta(key);
         const val = Number(appState.areas_distritales?.[key]);
-        return Number.isFinite(val) && val > 0 ? Math.floor(val) : (meta ? meta.defaultSlots : 2);
+        return Number.isFinite(val) && val > 0 ? Math.floor(val) : (meta ? meta.defaultSlots : 1);
     }
     const val = Number(appState.estaciones?.[key] ?? appState.config_estaciones?.[key] ?? 0);
     return Number.isFinite(val) && val >= 0 ? Math.floor(val) : 0;
@@ -609,11 +609,11 @@ function updateSyncBadges(mode, labelText) {
 export async function saveState() {
     appState.config_estaciones = { ...appState.estaciones };
     appState.areas_distritales = {
-        vrfe: Math.max(1, Number(appState.areas_distritales?.vrfe ?? 1)),
-        josa: Math.max(1, Number(appState.areas_distritales?.josa ?? 1)),
-        verificador_campo: Math.max(1, Number(appState.areas_distritales?.verificador_campo ?? 1)),
-        soporte_tecnico: Math.max(1, Number(appState.areas_distritales?.soporte_tecnico ?? 1)),
-        cartografia: Math.max(1, Number(appState.areas_distritales?.cartografia ?? 1))
+        vrfe: Math.max(1, Math.floor(Number(appState.areas_distritales?.vrfe ?? 1) || 1)),
+        josa: Math.max(1, Math.floor(Number(appState.areas_distritales?.josa ?? 1) || 1)),
+        verificador_campo: Math.max(1, Math.floor(Number(appState.areas_distritales?.verificador_campo ?? 1) || 1)),
+        soporte_tecnico: Math.max(1, Math.floor(Number(appState.areas_distritales?.soporte_tecnico ?? 1) || 1)),
+        cartografia: Math.max(1, Math.floor(Number(appState.areas_distritales?.cartografia ?? 2) || 2))
     };
     saveLocalCache(appState);
 
@@ -669,7 +669,7 @@ export function initFirebaseRealtimeListener(onStateChange) {
                         });
                     if (typeof onStateChange === "function") onStateChange();
                 }
-           } finally {
+            } finally {
                 isApplyingRemoteSnapshot = false;
             }
         },
