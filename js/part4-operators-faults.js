@@ -422,16 +422,35 @@ export function onAreaSlotsInputChange() {
     if (!sel || !inp) return;
 
     const key = normalizeUnitKey(sel.value);
-    const val = Math.max(1, parseInt(inp.value, 10) || 1);
-    inp.value = val;
+    const rawVal = parseInt(inp.value, 10);
+    if (!Number.isFinite(rawVal) || rawVal < 1) return;
 
     if (!appState.areas_distritales) appState.areas_distritales = {};
-    appState.areas_distritales[key] = val;
-    onAreaConfigSelectChange();
+    appState.areas_distritales[key] = rawVal;
+
+    const hint = document.getElementById("areaSlotsHint");
+    const badge = document.getElementById("areaSlotsSummaryBadge");
+    const areaKeys = ["vrfe", "josa", "verificador_campo", "soporte_tecnico", "cartografia"];
+    const resumen = areaKeys
+        .map(k => `${formatUnitLabel(k, { short: true })}: ${Math.max(1, Number(appState.areas_distritales?.[k] ?? 1))}`)
+        .join(" • ");
+    if (badge) {
+        const totalAreaSlots = areaKeys.reduce((acc, k) => acc + Math.max(1, Number(appState.areas_distritales?.[k] ?? 1)), 0);
+        badge.textContent = `${totalAreaSlots} puestos`;
+    }
+    if (hint) hint.textContent = resumen;
 }
 
 export async function saveStationCounts() {
-    onAreaSlotsInputChange();
+    const sel = document.getElementById("areaConfigSelect");
+    const inp = document.getElementById("areaSlotsInput");
+    if (sel && inp) {
+        const key = normalizeUnitKey(sel.value);
+        const val = Math.max(1, parseInt(inp.value, 10) || 1);
+        inp.value = val;
+        if (!appState.areas_distritales) appState.areas_distritales = {};
+        appState.areas_distritales[key] = val;
+    }
     appState.estaciones["050351"] = Math.max(0, Number(document.getElementById("cfg-050351").value));
     appState.estaciones["050353"] = Math.max(0, Number(document.getElementById("cfg-050353").value));
     appState.estaciones["050354"] = Math.max(0, Number(document.getElementById("cfg-050354").value));

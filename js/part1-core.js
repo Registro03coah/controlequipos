@@ -25,7 +25,7 @@ export { db, STATE_DOC_REF, setDoc, onSnapshot };
 const LOCAL_CACHE_KEY = "mac_inventario_cache_d03_v1";
 const SESSION_STORAGE_KEY = "mac_inventario_session_v1";
 
-export const ADMIN_PASS = "AdminMAC2026*";
+export const ADMIN_PASS = "admin123";
 export const DEFAULT_ADMIN_PASS = ADMIN_PASS;
 
 export const DEFAULT_AVATAR = "data:image/svg+xml;utf8," + encodeURIComponent(`
