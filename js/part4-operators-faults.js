@@ -135,7 +135,7 @@ export function enterApp({ skipInitialReset = false } = {}) {
         document.getElementById("operatorView").classList.remove("d-none");
         document.getElementById("adminView").classList.add("d-none");
         const estText = isDistrictArea(currentUser.modulo)
-            ? `${formatUnitLabel(currentUser.modulo, { short: true })} • ${formatStationLabel(currentUser.estacion, false, currentUser.modulo)}`
+            ? `${formatUnitLabel(currentUser.modulo, { short: true })} • Puesto ${Number(currentUser.estacion) || 1}`
             : (Number(currentUser.estacion) === 0 ? "Estacion 0 • Servidor" : `Estacion ${currentUser.estacion}`);
         document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge me-1"></i>${formatUnitLabel(currentUser.modulo, { short: true })} | ${estText}`;
         switchOpTab("equipos", persistSession);
@@ -233,7 +233,7 @@ export function updateOpRoleHint() {
     const hint = document.getElementById("opRoleHint");
 
     if (isDistrictArea(modulo)) {
-        hint.textContent = `Integrante de ${formatUnitLabel(modulo)} (${formatStationLabel(est, false, modulo)})`;
+        hint.textContent = `Integrante de ${formatUnitLabel(modulo)} (Puesto ${est || 1})`;
         hint.className = "text-success";
         return;
     }
@@ -376,9 +376,9 @@ export function renderOperatorsTable() {
         const unitKey = normalizeUnitKey(o.modulo);
         const areaMode = isDistrictArea(unitKey);
         const isServer = !areaMode && Number(o.estacion) === 0;
-        const unitBadgeText = formatUnitLabel(unitKey, { short: true });
+        const unitBadgeText = areaMode ? unitKey.toUpperCase() : formatUnitLabel(unitKey, { short: true });
         const estBadgeText = areaMode
-            ? formatStationLabel(o.estacion, false, unitKey)
+            ? `Puesto ${Number(o.estacion) || 1}`
             : (isServer ? "Est. 0 • Servidor" : `Est. ${o.estacion}`);
 
         return `
