@@ -1,17 +1,27 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+    getFirestore,
+    doc,
+    setDoc,
+    onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ==================== CONFIGURACIÓN FIREBASE Y AUTENTICACIÓN ====================
 const firebaseConfig = {
-    apiKey: "AIzaSyA_REEMPLAZA_CON_TU_API_KEY",
-    authDomain: "TU_PROYECTO.firebaseapp.com",
-    projectId: "TU_PROYECTO",
-    storageBucket: "TU_PROYECTO.appspot.com",
-    messagingSenderId: "000000000000",
-    appId: "1:000000000000:web:000000000000"
+    apiKey: "AIzaSyDfcsDQIJeUXVMMe0k32YelDKv5krbO1M0",
+    authDomain: "componentes-45e77.firebaseapp.com",
+    projectId: "componentes-45e77",
+    storageBucket: "componentes-45e77.firebasestorage.app",
+    messagingSenderId: "540395896737",
+    appId: "1:540395896737:web:6ebc5f5de08854751a55e0"
 };
 
-const FIRESTORE_DOC_PATH = ["inventario_macs_d03", "estado_global"];
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const STATE_DOC_REF = doc(db, "macs_sistema", "estado_global_v1");
+
+export { db, STATE_DOC_REF, setDoc, onSnapshot };
+
 const LOCAL_CACHE_KEY = "mac_inventario_cache_d03_v1";
 const SESSION_STORAGE_KEY = "mac_inventario_session_v1";
 
@@ -558,7 +568,7 @@ function hydrateState(raw) {
     return base;
 }
 
-// ==================== PERSISTENCIA LOCAL Y FIREBASE ====================
+// ==================== PERSISTENCIA LOCAL Y FIRESTORE ====================
 function saveLocalCache(stateObj) {
     try {
         localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(stateObj));
@@ -575,30 +585,8 @@ function loadLocalCache() {
     }
 }
 
-let db = null;
-let stateDocRef = null;
 let isApplyingRemoteSnapshot = false;
-
-function hasValidFirebaseConfig() {
-    return (
-        firebaseConfig.apiKey &&
-        !firebaseConfig.apiKey.includes("REEMPLAZA") &&
-        firebaseConfig.projectId &&
-        firebaseConfig.projectId !== "TU_PROYECTO"
-    );
-}
-
-function getFirestoreDocRef() {
-    if (!hasValidFirebaseConfig()) return null;
-    if (!db) {
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-    }
-    if (!stateDocRef) {
-        stateDocRef = doc(db, FIRESTORE_DOC_PATH[0], FIRESTORE_DOC_PATH[1]);
-    }
-    return stateDocRef;
-}
+let unsubscribeRealtime = null;
 
 function updateSyncBadges(mode, labelText) {
     const badgeIds = ["loginSyncBadge", "cloudStatusBadge"];
@@ -624,22 +612,16 @@ export async function saveState() {
 
     if (isApplyingRemoteSnapshot) return;
 
-    const ref = getFirestoreDocRef();
-    if (!ref) {
-        updateSyncBadges("local", "Modo Local");
-        return;
-    }
-
     try {
         updateSyncBadges("saving", "Guardando...");
-        await setDoc(ref, {
+        await setDoc(STATE_DOC_REF, {
             ...appState,
             updated_at: new Date().toISOString()
         });
         updateSyncBadges("online", "Nube Sincronizada");
     } catch (err) {
-        console.warn("Error al guardar en Firestore, conservado en caché local:", err);
-        updateSyncBadges("local", "Caché Local");
+        console.error("Firestore save error:", err);
+        updateSyncBadges("local", "Error Nube (Local)");
     }
 }
 
@@ -650,63 +632,44 @@ export function initFirebaseRealtimeListener(onStateChange) {
         if (typeof onStateChange === "function") onStateChange();
     }
 
-    const ref = getFirestoreDocRef();
-    if (!ref) {
-        updateSyncBadges("local", "Modo Local");
-        if (!cached && typeof onStateChange === "function") onStateChange();
-        return;
+    updateSyncBadges("saving", "Conectando Nube...");
+
+    if (typeof unsubscribeRealtime === "function") {
+        unsubscribeRealtime();
     }
 
-    updateSyncBadges("local", "Conectando...");
-
-    onSnapshot(
-        ref,
-        async (snap) => {
+    unsubscribeRealtime = onSnapshot(
+        STATE_DOC_REF,
+        (snap) => {
             isApplyingRemoteSnapshot = true;
             try {
                 if (snap.exists()) {
-                    const remoteData = snap.data();
-                    appState = hydrateState(remoteData);
+                    appState = hydrateState(snap.data());
                     saveLocalCache(appState);
                     updateSyncBadges("online", "Nube Activa");
+                    if (typeof onStateChange === "function") onStateChange();
                 } else {
-                    const initial = hydrateState(cached || DEFAULT_STATE);
-                    appState = initial;
+                    appState = hydrateState(cached || DEFAULT_STATE);
                     saveLocalCache(appState);
-                    await setDoc(ref, {
+                    setDoc(STATE_DOC_REF, {
                         ...appState,
                         updated_at: new Date().toISOString()
-                    });
-                    updateSyncBadges("online", "Nube Inicializada");
+                    })
+                        .then(() => updateSyncBadges("online", "Nube Inicializada"))
+                        .catch((err) => {
+                            console.error("Error al crear documento inicial en Firestore:", err);
+                            updateSyncBadges("local", "Error Nube (Local)");
+                        });
+                    if (typeof onStateChange === "function") onStateChange();
                 }
-                if (typeof onStateChange === "function") onStateChange();
-            } catch (err) {
-                console.warn("Error procesando snapshot de Firestore:", err);
-                updateSyncBadges("local", "Caché Local");
             } finally {
                 isApplyingRemoteSnapshot = false;
             }
         },
         (err) => {
-            console.warn("Error de conexión en tiempo real con Firestore:", err);
+            console.error("Firestore onSnapshot error:", err);
             updateSyncBadges("local", "Sin Nube (Local)");
             if (typeof onStateChange === "function") onStateChange();
         }
     );
-}
-
-export async function initCloudSync(onStateChange) {
-    initFirebaseRealtimeListener(onStateChange);
-    const ref = getFirestoreDocRef();
-    if (!ref) return;
-    try {
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-            isApplyingRemoteSnapshot = true;
-            appState = hydrateState(snap.data());
-            saveLocalCache(appState);
-            isApplyingRemoteSnapshot = false;
-            if (typeof onStateChange === "function") onStateChange();
-        }
-    } catch (_) {}
 }
