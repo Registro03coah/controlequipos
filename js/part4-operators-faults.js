@@ -168,8 +168,9 @@ export function refreshAdminUI({ preserveSelection = false } = {}) {
     const activeFaults = appState.tickets_fallas.filter(f => f.estatus_ticket !== "Finalizada");
     document.getElementById("adminStatTotal").textContent = countRealComponents(appState.componentes);
     document.getElementById("adminStatOperators").textContent = appState.operadores.length;
-    const totalStations = Object.values(appState.estaciones).reduce((a, b) => a + 1 + Math.max(0, Number(b)), 0);
-    document.getElementById("adminStatStations").textContent = totalStations;
+    const macStationsTotal = Object.values(appState.estaciones || {}).reduce((a, b) => a + 1 + Math.max(0, Number(b || 0)), 0);
+    const areaStationsTotal = Object.values(appState.areas_distritales || {}).reduce((a, b) => a + Math.max(1, Number(b || 1)), 0);
+    document.getElementById("adminStatStations").textContent = macStationsTotal + areaStationsTotal;
     document.getElementById("adminStatFaults").textContent = activeFaults.length;
     document.getElementById("admFaultBadge").textContent = activeFaults.length;
 
@@ -783,3 +784,4 @@ export function openPrintFaultFormat(faultId, mode = "initial") {
     document.getElementById("printFormatArea").innerHTML = printHtml;
     new bootstrap.Modal(document.getElementById("printModal")).show();
 }
+```[cite: 17]
