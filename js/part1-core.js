@@ -672,4 +672,6 @@ export function initFirebaseRealtimeListener(onStateChange) {
             } finally {
                 isApplyingRemoteSnapshot = false;
             }
+            );
+}
         
