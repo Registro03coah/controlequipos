@@ -1,20 +1,24 @@
 import {
+    ADMIN_PASS,
     appState,
     currentUser,
     activeOpTab,
     DEFAULT_AVATAR,
+    DISTRICT_AREAS,
     normalizeText,
+    normalizeUnitKey,
+    isDistrictArea,
+    formatUnitLabel,
+    populateUnitSelect,
     sortAlphaEs,
     isNoAplicaComponent,
     countRealComponents,
-    getTotalConfiguredStations,
     normalizeComponentRecord,
     formatStationLabel,
     getOperatorByStation,
     fillStationOptions,
     saveState,
-    initCloudSync,
-    DEFAULT_ADMIN_PASS
+    initFirebaseRealtimeListener
 } from "./part1-core.js";
 
 import {
@@ -145,7 +149,7 @@ function tryRestoreSession() {
         }
 
         if (saved.role === "operator") {
-            const mod = saved.modulo;
+            const mod = normalizeUnitKey(saved.modulo);
             const est = Number(saved.estacion);
             const op = getOperatorByStation(mod, est);
             if (!op) return false;
@@ -155,7 +159,9 @@ function tryRestoreSession() {
             document.getElementById("mainApp").classList.remove("d-none");
             document.getElementById("adminView").classList.add("d-none");
             document.getElementById("operatorView").classList.remove("d-none");
-            document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge-fill text-danger me-1"></i>${op.nombre_completo} (${mod} • ${Number(est) === 0 ? "Est. 0" : "Est. " + est})`;
+            const unitShort = formatUnitLabel(mod, { short: true });
+            const estTxt = formatStationLabel(est, false, mod);
+            document.getElementById("sessionBadge").innerHTML = `<i class="bi bi-person-badge-fill text-danger me-1"></i>${op.nombre_completo} (${unitShort} • ${estTxt})`;
             refreshOperatorUI();
             switchOpTab(saved.opTab || "equipos");
             return true;
@@ -176,8 +182,10 @@ export function refreshOperatorUI() {
 export function switchAdminTab(tab) {
     const tabs = ["inventario", "stock", "traspasos", "operadores", "fallas", "config"];
     tabs.forEach(t => {
-        document.getElementById(`adm-tab-${t}`).classList.toggle("active", t === tab);
-        document.getElementById(`admSection${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.toggle("d-none", t !== tab);
+        const btn = document.getElementById(`adm-tab-${t}`);
+        const sec = document.getElementById(`admSection${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (btn) btn.classList.toggle("active", t === tab);
+        if (sec) sec.classList.toggle("d-none", t !== tab);
     });
     if (tab === "inventario") renderAdminInventoryGrouped();
     if (tab === "stock") renderAdminStockTable();
@@ -188,11 +196,17 @@ export function switchAdminTab(tab) {
     persistSession();
 }
 
+function getTotalSlotsCount() {
+    const macSlots = Object.values(appState.estaciones || {}).reduce((acc, n) => acc + 1 + Math.max(0, Number(n || 0)), 0);
+    const areaSlots = Object.values(appState.areas_distritales || {}).reduce((acc, n) => acc + Math.max(1, Number(n || 1)), 0);
+    return macSlots + areaSlots;
+}
+
 export function refreshAdminUI({ preserveSelection = false } = {}) {
     const realAssignedCount = countRealComponents(appState.componentes);
     document.getElementById("adminStatTotal").textContent = realAssignedCount;
     document.getElementById("adminStatOperators").textContent = appState.operadores.length;
-    document.getElementById("adminStatStations").textContent = getTotalConfiguredStations();
+    document.getElementById("adminStatStations").textContent = getTotalSlotsCount();
 
     const openFaults = appState.tickets_fallas.filter(f => f.estatus_ticket !== "Finalizada").length;
     document.getElementById("adminStatFaults").textContent = openFaults;
@@ -200,24 +214,29 @@ export function refreshAdminUI({ preserveSelection = false } = {}) {
     document.getElementById("admStockBadge").textContent = (appState.stock_resguardo || []).length;
 
     const alertBar = document.getElementById("adminTicketAlertBar");
-    if (openFaults > 0) {
-        alertBar.classList.remove("d-none");
-        alertBar.classList.add("d-flex");
-        document.getElementById("adminTicketAlertCount").textContent = openFaults;
-    } else {
-        alertBar.classList.add("d-none");
-        alertBar.classList.remove("d-flex");
+    if (alertBar) {
+        if (openFaults > 0) {
+            alertBar.classList.remove("d-none");
+            alertBar.classList.add("d-flex");
+            document.getElementById("adminTicketAlertCount").textContent = openFaults;
+        } else {
+            alertBar.classList.add("d-none");
+            alertBar.classList.remove("d-flex");
+        }
     }
 
-    const prevMod = document.getElementById("compModulo").value || "050351";
-    const prevEst = Number(document.getElementById("compEstacion").value || 0);
+    const prevMod = normalizeUnitKey(document.getElementById("compModulo").value || "050351");
+    const prevEst = Number(document.getElementById("compEstacion").value || (isDistrictArea(prevMod) ? 1 : 0));
 
-    document.getElementById("cfg-050351").value = appState.config_estaciones["050351"];
-    document.getElementById("cfg-050353").value = appState.config_estaciones["050353"];
-    document.getElementById("cfg-050354").value = appState.config_estaciones["050354"];
+    document.getElementById("cfg-050351").value = appState.estaciones["050351"] ?? 0;
+    document.getElementById("cfg-050353").value = appState.estaciones["050353"] ?? 0;
+    document.getElementById("cfg-050354").value = appState.estaciones["050354"] ?? 0;
+
+    populateUnitSelect(document.getElementById("compModulo"));
+    document.getElementById("compModulo").value = prevMod;
 
     fillStationOptions(document.getElementById("compEstacion"), prevMod, {
-        selectedValue: preserveSelection ? prevEst : 0
+        selectedValue: preserveSelection ? prevEst : (isDistrictArea(prevMod) ? 1 : 0)
     });
     updateCompAssignedOperatorHint();
 
@@ -231,8 +250,9 @@ export function refreshAdminUI({ preserveSelection = false } = {}) {
 }
 
 export function onAdminCompModuloChange() {
-    const mod = document.getElementById("compModulo").value;
-    fillStationOptions(document.getElementById("compEstacion"), mod, { selectedValue: 0 });
+    const mod = normalizeUnitKey(document.getElementById("compModulo").value);
+    const defEst = isDistrictArea(mod) ? 1 : 0;
+    fillStationOptions(document.getElementById("compEstacion"), mod, { selectedValue: defEst });
     updateCompAssignedOperatorHint();
 }
 
@@ -242,13 +262,16 @@ export function onAdminStationOrBrandChange() {
 }
 
 export function updateCompAssignedOperatorHint() {
-    const mod = document.getElementById("compModulo").value;
-    const est = Number(document.getElementById("compEstacion").value ?? 0);
+    const mod = normalizeUnitKey(document.getElementById("compModulo").value);
+    const est = Number(document.getElementById("compEstacion").value ?? (isDistrictArea(mod) ? 1 : 0));
     const hint = document.getElementById("compOperatorHint");
     const op = getOperatorByStation(mod, est);
     if (op) {
         hint.textContent = `Asignado a: ${op.nombre_completo} (${op.correo_institucional})`;
         hint.className = "text-success fw-semibold";
+    } else if (isDistrictArea(mod)) {
+        hint.textContent = `${formatUnitLabel(mod, { short: true })} (${formatStationLabel(est, false, mod)}): sin integrante asignado aun`;
+        hint.className = "text-danger fw-semibold";
     } else {
         hint.textContent = est === 0
             ? "Estacion 0 (Servidor): sin responsable asignado aun"
@@ -304,11 +327,13 @@ export function exportInventoryExcel() {
     }
 
     const rows = appState.componentes.map((c, idx) => {
-        const op = getOperatorByStation(c.modulo, c.estacion);
+        const modKey = normalizeUnitKey(c.modulo);
+        const op = getOperatorByStation(modKey, c.estacion);
         const isNA = isNoAplicaComponent(c);
         return {
             "num": idx + 1,
-            "modulo": c.modulo,
+            "modulo": modKey,
+            "area_o_modulo": formatUnitLabel(modKey, { short: true }),
             "estacion": Number(c.estacion),
             "tipo_componente": c.tipo_componente,
             "marca": isNA ? "NO APLICA" : c.marca,
@@ -330,7 +355,7 @@ export function exportInventoryExcel() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-        { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 22 },
+        { wch: 6 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 22 },
         { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 16 },
         { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 14 },
         { wch: 26 }, { wch: 28 }, { wch: 28 }, { wch: 20 }, { wch: 20 }
@@ -357,31 +382,31 @@ export function downloadImportTemplate() {
             "observaciones": "Equipo principal de estacion"
         },
         {
-            "modulo": "050351",
+            "modulo": "vrfe",
             "estacion": 1,
-            "tipo_componente": "Monitor",
-            "marca": "Dell",
-            "modelo": "P2222H",
-            "numero_serie": "MON-EJEMPLO-001",
+            "tipo_componente": "Telefono IP",
+            "marca": "Cisco",
+            "modelo": "IP Phone 7841",
+            "numero_serie": "TEL-EJEMPLO-001",
             "inventario_ine": "INV-002",
-            "serie_cpu_vinculada": "CPU-EJEMPLO-001",
+            "serie_cpu_vinculada": "",
             "serie_lente": "",
             "serie_docking": "",
             "estado_fisico": "Operativo",
             "observaciones": ""
         },
         {
-            "modulo": "050353",
-            "estacion": 2,
-            "tipo_componente": "Escaner / Scanner",
-            "marca": "NO APLICA",
-            "modelo": "NO APLICA",
-            "numero_serie": "NO APLICA",
-            "inventario_ine": "",
+            "modulo": "cartografia",
+            "estacion": 1,
+            "tipo_componente": "Tableta",
+            "marca": "Samsung",
+            "modelo": "Galaxy Tab",
+            "numero_serie": "TAB-EJEMPLO-001",
+            "inventario_ine": "INV-003",
             "serie_cpu_vinculada": "",
             "serie_lente": "",
             "serie_docking": "",
-            "estado_fisico": "No Aplica",
+            "estado_fisico": "Operativo",
             "observaciones": ""
         }
     ];
@@ -422,13 +447,16 @@ export async function importInventoryExcel(event) {
             let updated = 0;
             let skipped = 0;
 
-            jsonRows.forEach(row => {
-                let modRaw = parseRowValue(row, ["modulo", "Modulo", "MODULO", "módulo", "Módulo"]);
-                if (modRaw === "500351") modRaw = "050351";
-                const modulo = ["050351", "050353", "050354"].includes(modRaw) ? modRaw : "050351";
+            const validUnits = ["050351", "050353", "050354", ...DISTRICT_AREAS.map(a => a.key)];
 
-                const estRaw = parseRowValue(row, ["estacion", "Estacion", "ESTACION", "estación", "Estación"]);
-                const estacion = estRaw === "" ? 0 : Math.max(0, parseInt(estRaw, 10) || 0);
+            jsonRows.forEach(row => {
+                const modRaw = parseRowValue(row, ["modulo", "Modulo", "MODULO", "módulo", "Módulo", "area", "Area"]);
+                const normalizedMod = normalizeUnitKey(modRaw);
+                const modulo = validUnits.includes(normalizedMod) ? normalizedMod : "050351";
+
+                const defaultEst = isDistrictArea(modulo) ? 1 : 0;
+                const estRaw = parseRowValue(row, ["estacion", "Estacion", "ESTACION", "estación", "Estación", "persona", "Persona"]);
+                const estacion = estRaw === "" ? defaultEst : Math.max(isDistrictArea(modulo) ? 1 : 0, parseInt(estRaw, 10) || defaultEst);
 
                 const tipoRaw = parseRowValue(row, ["tipo_componente", "Tipo Componente", "tipo", "Tipo", "COMPONENTES", "Componente"]) || "Computadora / CPU";
                 const matchedType = appState.tipos_componente.find(t => normalizeText(t) === normalizeText(tipoRaw));
@@ -454,7 +482,7 @@ export async function importInventoryExcel(event) {
                 if (isNA) {
                     const existingNA = appState.componentes.find(
                         c => isNoAplicaComponent(c) &&
-                             c.modulo === modulo &&
+                             normalizeUnitKey(c.modulo) === modulo &&
                              Number(c.estacion) === estacion &&
                              normalizeText(c.tipo_componente) === normalizeText(tipo_componente)
                     );
@@ -569,10 +597,11 @@ export function exportFaultsExcel() {
         "num": idx + 1,
         "folio_ticket": f.folio_ticket,
         "fecha_reporte": f.fecha_reporte,
-        "modulo": f.modulo,
+        "modulo": normalizeUnitKey(f.modulo),
+        "area_o_modulo": formatUnitLabel(f.modulo, { short: true }),
         "estacion": Number(f.estacion),
-        "operador": f.operador_nombre,
-        "correo_operador": f.operador_correo,
+        "usuario": f.usuario_nombre,
+        "correo_usuario": f.usuario_correo,
         "tipo_componente": f.tipo_componente,
         "marca": f.marca,
         "modelo": f.modelo,
@@ -581,9 +610,9 @@ export function exportFaultsExcel() {
         "descripcion_falla": f.descripcion_falla,
         "estatus_ticket": f.estatus_ticket,
         "fecha_cierre": f.fecha_cierre || "",
-        "tecnico_solucion": f.tecnico_solucion || "",
-        "accion_solucion": f.accion_solucion || "",
-        "notas_solucion": f.notas_solucion || ""
+        "tecnico_responsable": f.tecnico_responsable || "",
+        "tipo_solucion": f.tipo_solucion || "",
+        "notas_seguimiento": f.notas_seguimiento || ""
     }));
 
     const wb = XLSX.utils.book_new();
@@ -615,7 +644,7 @@ export function printReportArea() {
 
 // ==================== EXPOSICIÓN GLOBAL PARA HANDLERS HTML ====================
 Object.assign(window, {
-    DEFAULT_ADMIN_PASS,
+    ADMIN_PASS,
     switchLoginTab,
     onLoginModuloChange,
     previewOperatorProfile,
@@ -689,6 +718,15 @@ Object.assign(window, {
 
 // ==================== INICIALIZACIÓN DE LA APLICACIÓN ====================
 window.addEventListener("DOMContentLoaded", () => {
+    populateUnitSelect(document.getElementById("loginModulo"));
+    populateUnitSelect(document.getElementById("adminFilterModulo"), { includeAll: true });
+    populateUnitSelect(document.getElementById("trSourceModulo"), { includeAll: true, allLabel: "Todos los Modulos y Areas" });
+    populateUnitSelect(document.getElementById("trTargetModulo"));
+    populateUnitSelect(document.getElementById("opRegModulo"));
+    populateUnitSelect(document.getElementById("filterOpModulo"), { includeAll: true });
+    populateUnitSelect(document.getElementById("assignStockModulo"));
+    populateUnitSelect(document.getElementById("compModulo"));
+
     onLoginModuloChange();
     onOpRegModuloChange();
     fillStationOptions(document.getElementById("compEstacion"), "050351", { selectedValue: 0 });
@@ -696,7 +734,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const restored = tryRestoreSession();
 
-    initCloudSync(() => {
+    initFirebaseRealtimeListener(() => {
         if (restored && currentUser) {
             if (currentUser.role === "admin") {
                 refreshAdminUI({ preserveSelection: true });
