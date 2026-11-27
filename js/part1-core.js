@@ -608,12 +608,12 @@ function updateSyncBadges(mode, labelText) {
 
 export async function saveState() {
     appState.config_estaciones = { ...appState.estaciones };
-    appState.areas_distritales = {
-        vrfe: Math.max(1, Number(appState.areas_distritales?.vrfe ?? 1)),
-        josa: Math.max(1, Number(appState.areas_distritales?.josa ?? 1)),
-        verificador_campo: Math.max(1, Number(appState.areas_distritales?.verificador_campo ?? 1)),
-        soporte_tecnico: Math.max(1, Number(appState.areas_distritales?.soporte_tecnico ?? 1)),
-        cartografia: Math.max(1, Number(appState.areas_distritales?.cartografia ?? 1))
+appState.areas_distritales = {
+        vrfe: Math.max(1, Math.floor(Number(appState.areas_distritales?.vrfe ?? 1) || 1)),
+        josa: Math.max(1, Math.floor(Number(appState.areas_distritales?.josa ?? 1) || 1)),
+        verificador_campo: Math.max(1, Math.floor(Number(appState.areas_distritales?.verificador_campo ?? 1) || 1)),
+        soporte_tecnico: Math.max(1, Math.floor(Number(appState.areas_distritales?.soporte_tecnico ?? 1) || 1)),
+        cartografia: Math.max(1, Math.floor(Number(appState.areas_distritales?.cartografia ?? 2) || 2))
     };
     saveLocalCache(appState);
 
