@@ -13,6 +13,7 @@ const firebaseConfig = {
 
 const FIRESTORE_DOC_PATH = ["inventario_macs_d03", "estado_global"];
 const LOCAL_CACHE_KEY = "mac_inventario_cache_d03_v1";
+const SESSION_STORAGE_KEY = "mac_inventario_session_v1";
 
 export const ADMIN_PASS = "AdminMAC2026*";
 export const DEFAULT_ADMIN_PASS = ADMIN_PASS;
@@ -100,10 +101,13 @@ export const DEFAULT_STATE = {
 export let appState = cloneDefaultState();
 export let currentUser = null;
 export let activeOpTab = "equipos";
+export let activeAdminTab = "inventario";
 
 export let html5QrCode = null;
 export let targetScannerInputId = "compSerie";
 export let currentCompPhoto = "";
+export let currentOpPhoto = "";
+export let currentFaultPhoto = "";
 
 export function setCurrentUser(val) {
     currentUser = val;
@@ -111,7 +115,11 @@ export function setCurrentUser(val) {
 }
 
 export function setActiveOpTab(tab) {
-    activeOpTab = tab;
+    activeOpTab = tab || "equipos";
+}
+
+export function setActiveAdminTab(tab) {
+    activeAdminTab = tab || "inventario";
 }
 
 export function setHtml5QrCode(scanner) {
@@ -126,8 +134,38 @@ export function setCurrentCompPhoto(dataUrl) {
     currentCompPhoto = dataUrl || "";
 }
 
+export function setCurrentOpPhoto(dataUrl) {
+    currentOpPhoto = dataUrl || "";
+}
+
+export function setCurrentFaultPhoto(dataUrl) {
+    currentFaultPhoto = dataUrl || "";
+}
+
 function cloneDefaultState() {
     return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
+export function persistSession() {
+    try {
+        if (!currentUser) {
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            return;
+        }
+        if (currentUser.role === "admin") {
+            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+                role: "admin",
+                admTab: activeAdminTab || "inventario"
+            }));
+        } else if (currentUser.role === "operator") {
+            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+                role: "operator",
+                modulo: normalizeUnitKey(currentUser.modulo),
+                estacion: Number(currentUser.estacion),
+                opTab: activeOpTab || "equipos"
+            }));
+        }
+    } catch (_) {}
 }
 
 // ==================== NORMALIZACIÓN DE TEXTO Y UNIDADES (MAC / ÁREAS) ====================
@@ -154,7 +192,7 @@ export function normalizeUnitKey(val) {
     const norm = normalizeText(raw).replace(/[\s-]+/g, "_");
     if (norm === "050351" || norm === "50351" || norm === "500351" || norm.includes("050351")) return "050351";
     if (norm === "050353" || norm === "50353" || norm.includes("050353")) return "050353";
-    if (norm === "050354" || norm === "050354" || norm.includes("050354")) return "050354";
+    if (norm === "050354" || norm === "50354" || norm.includes("050354")) return "050354";
 
     if (norm === "vrfe" || norm.includes("vocalia")) return "vrfe";
     if (norm === "josa" || norm.includes("organizacion")) return "josa";
@@ -255,22 +293,30 @@ export function formatStationLabel(estacion, includeRoleHint = false, unitKey = 
     return op ? `${base} (${op.nombre_completo})` : base;
 }
 
-export function fillStationOptions(selectEl, unitKey, { includeRoleHint = false, selectedValue = null } = {}) {
+export function fillStationOptions(selectEl, unitKey, { includeRoleHint = false, onlyUserName = false, selectedValue = null } = {}) {
     if (!selectEl) return;
     const key = normalizeUnitKey(unitKey);
     const count = getConfiguredStationsCount(key);
     const options = [];
 
+    const buildLabel = (slotNum) => {
+        if (onlyUserName) {
+            const op = getOperatorByStation(key, slotNum);
+            const base = formatStationLabel(slotNum, false, key);
+            return op ? `${op.nombre_completo} — ${base}` : `${base} (Sin asignar)`;
+        }
+        return formatStationLabel(slotNum, includeRoleHint, key);
+    };
+
     if (isDistrictArea(key)) {
         const totalSlots = Math.max(1, count);
         for (let i = 1; i <= totalSlots; i++) {
-            const label = formatStationLabel(i, includeRoleHint, key);
-            options.push(`<option value="${i}">${label}</option>`);
+            options.push(`<option value="${i}">${buildLabel(i)}</option>`);
         }
     } else {
-        options.push(`<option value="0">${formatStationLabel(0, includeRoleHint, key)}</option>`);
+        options.push(`<option value="0">${buildLabel(0)}</option>`);
         for (let i = 1; i <= count; i++) {
-            options.push(`<option value="${i}">${formatStationLabel(i, includeRoleHint, key)}</option>`);
+            options.push(`<option value="${i}">${buildLabel(i)}</option>`);
         }
     }
 
@@ -293,6 +339,48 @@ export function getOperatorByStation(unitKey, estacion) {
     return (appState.operadores || []).find(
         op => normalizeUnitKey(op.modulo) === key && Number(op.estacion) === estNum
     ) || null;
+}
+
+export function normalizeOperatorRecord(rec) {
+    const modulo = normalizeUnitKey(rec.modulo);
+    const estacion = Number.isFinite(Number(rec.estacion)) ? Number(rec.estacion) : (isDistrictArea(modulo) ? 1 : 0);
+    return {
+        id: rec.id || ("OP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
+        modulo,
+        estacion,
+        nombre_completo: String(rec.nombre_completo || "").trim(),
+        telefono: String(rec.telefono || "").trim(),
+        correo_institucional: String(rec.correo_institucional || "").trim().toLowerCase(),
+        foto_url: rec.foto_url || ""
+    };
+}
+
+export function normalizeFaultTicketRecord(rec) {
+    const modulo = normalizeUnitKey(rec.modulo);
+    const estacion = Number.isFinite(Number(rec.estacion)) ? Number(rec.estacion) : (isDistrictArea(modulo) ? 1 : 0);
+    return {
+        id: rec.id || ("FLT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5)),
+        folio_ticket: rec.folio_ticket || ("TKT-" + Date.now()),
+        fecha_reporte: rec.fecha_reporte || new Date().toLocaleString("es-MX"),
+        modulo,
+        estacion,
+        usuario_nombre: rec.usuario_nombre || rec.operador_nombre || "Usuario",
+        usuario_telefono: rec.usuario_telefono || "N/A",
+        usuario_correo: rec.usuario_correo || rec.operador_correo || "N/A",
+        componente_id: rec.componente_id || "",
+        tipo_componente: rec.tipo_componente || "Equipo",
+        marca: rec.marca || "",
+        modelo: rec.modelo || "",
+        numero_serie: String(rec.numero_serie || "").trim().toUpperCase(),
+        categoria_falla: rec.categoria_falla || "Falla Tecnica",
+        descripcion_falla: rec.descripcion_falla || "",
+        foto_evidencia: rec.foto_evidencia || "",
+        estatus_ticket: rec.estatus_ticket || "Ticket Abierto / Pendiente",
+        fecha_cierre: rec.fecha_cierre || "",
+        tecnico_responsable: rec.tecnico_responsable || rec.tecnico_solucion || "",
+        tipo_solucion: rec.tipo_solucion || rec.accion_solucion || "",
+        notas_seguimiento: rec.notas_seguimiento || rec.notas_solucion || ""
+    };
 }
 
 // ==================== COMPONENTES, ÍCONOS Y NORMALIZACIÓN ====================
@@ -461,24 +549,10 @@ function hydrateState(raw) {
     base.marcas = marcasMerged;
     base.tipos_componente = tiposMerged;
 
-    base.operadores = (Array.isArray(src.operadores) ? src.operadores : []).map(op => ({
-        ...op,
-        modulo: normalizeUnitKey(op.modulo),
-        estacion: Number(op.estacion)
-    }));
-
+    base.operadores = (Array.isArray(src.operadores) ? src.operadores : []).map(normalizeOperatorRecord);
     base.componentes = (Array.isArray(src.componentes) ? src.componentes : []).map(normalizeComponentRecord);
     base.stock_resguardo = (Array.isArray(src.stock_resguardo) ? src.stock_resguardo : []).map(normalizeStockRecord);
-    base.tickets_fallas = (Array.isArray(src.tickets_fallas) ? src.tickets_fallas : []).map(f => ({
-        ...f,
-        modulo: normalizeUnitKey(f.modulo),
-        estacion: Number(f.estacion),
-        usuario_nombre: f.usuario_nombre || f.operador_nombre || "Usuario",
-        usuario_correo: f.usuario_correo || f.operador_correo || "",
-        tecnico_responsable: f.tecnico_responsable || f.tecnico_solucion || "",
-        tipo_solucion: f.tipo_solucion || f.accion_solucion || "",
-        notas_seguimiento: f.notas_seguimiento || f.notas_solucion || ""
-    }));
+    base.tickets_fallas = (Array.isArray(src.tickets_fallas) ? src.tickets_fallas : []).map(normalizeFaultTicketRecord);
     base.historial_traspasos = Array.isArray(src.historial_traspasos) ? src.historial_traspasos : [];
 
     return base;
