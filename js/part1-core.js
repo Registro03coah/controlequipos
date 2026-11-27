@@ -710,4 +710,3 @@ export async function initCloudSync(onStateChange) {
         }
     } catch (_) {}
 }
-export { activeAdminTab };
