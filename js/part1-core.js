@@ -49,21 +49,21 @@ export const MAC_MODULES = ["050351", "050353", "050354"];
 // ==================== ESTADO GLOBAL Y MUTADORES ====================
 export const DEFAULT_STATE = {
     estaciones: {
-        "050351": 4,
+        "050351": 7,
         "050353": 3,
-        "050354": 3
+        "050354": 2
     },
     config_estaciones: {
-        "050351": 4,
+        "050351": 7,
         "050353": 3,
-        "050354": 3
+        "050354": 2
     },
     areas_distritales: {
-        vrfe: 3,
-        josa: 3,
-        verificador_campo: 4,
-        soporte_tecnico: 2,
-        cartografia: 3
+        vrfe: 1,
+        josa: 1,
+        verificador_campo: 1,
+        soporte_tecnico: 1,
+        cartografia: 2
     },
     marcas: [
         "NO APLICA",
