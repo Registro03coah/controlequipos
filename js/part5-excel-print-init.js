@@ -297,6 +297,9 @@ export async function saveComponentFromModal(e) {
 export async function saveStockFromModal(e) {
     await saveStockFromModalBase(e, refreshAdminUI);
 }
+export function editStockById(id) {
+    editStockByIdBase(id);
+}
 export async function deleteStockItem(id) {
     await deleteStockItemBase(id, refreshAdminUI);
 }
