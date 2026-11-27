@@ -12,6 +12,8 @@ import {
     saveState
 } from "./part1-core.js";
 
+let stockSortState = { field: null, dir: "asc" };
+
 function findAssignedComponentBySerial(serie, excludeId = "") {
     const clean = String(serie || "").trim().toUpperCase();
     if (!clean || clean === "NO APLICA") return null;
@@ -20,6 +22,55 @@ function findAssignedComponentBySerial(serie, excludeId = "") {
              String(c.numero_serie || "").trim().toUpperCase() === clean &&
              c.id !== excludeId
     ) || null;
+}
+
+function getStockSortValue(s, field, isDesinc) {
+    switch (field) {
+        case "origen":
+            return s.origen || "";
+        case "destino":
+            return s.destino || "";
+        case "inventario_ine":
+            return s.inventario_ine || "";
+        case "descripcion":
+            return s.descripcion || "";
+        case "marca_modelo":
+            return `${s.marca || ""} ${s.modelo || ""}`.trim();
+        case "numero_serie":
+            return s.numero_serie || "";
+        case "estatus":
+            return isDesinc ? "Desincorporado" : (s.estatus || "Stock");
+        case "desincorporacion":
+            return isDesinc ? "Si" : "No";
+        case "fecha_desincorporacion":
+            return `${s.fecha_desincorporacion || ""} ${s.oficio_desincorporacion || ""}`.trim();
+        default:
+            return "";
+    }
+}
+
+function updateStockSortIcons() {
+    document.querySelectorAll("[data-sort-icon]").forEach(el => {
+        const col = el.getAttribute("data-sort-icon");
+        el.className = "small ms-1 ";
+        if (stockSortState.field === col) {
+            el.className += stockSortState.dir === "asc"
+                ? "bi bi-arrow-up text-primary fw-bold"
+                : "bi bi-arrow-down text-primary fw-bold";
+        } else {
+            el.className += "bi bi-arrow-down-up text-muted";
+        }
+    });
+}
+
+export function sortStockByColumn(field) {
+    if (stockSortState.field === field) {
+        stockSortState.dir = stockSortState.dir === "asc" ? "desc" : "asc";
+    } else {
+        stockSortState.field = field;
+        stockSortState.dir = "asc";
+    }
+    renderAdminStockTable();
 }
 
 // ==================== STOCK / BODEGA Y DESINCORPORACIÓN ====================
@@ -372,6 +423,16 @@ export function renderAdminStockTable() {
         }
         return true;
     });
+
+    if (stockSortState.field) {
+        const mult = stockSortState.dir === "asc" ? 1 : -1;
+        filtered.sort((a, b) => {
+            const valA = getStockSortValue(a, stockSortState.field, isDesincRecord(a));
+            const valB = getStockSortValue(b, stockSortState.field, isDesincRecord(b));
+            return valA.localeCompare(valB, "es", { numeric: true, sensitivity: "base" }) * mult;
+        });
+    }
+    updateStockSortIcons();
 
     if (!filtered.length) {
         tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No hay equipos registrados en Stock / Resguardo con este filtro.</td></tr>`;
@@ -782,32 +843,35 @@ export function openPrintTransferFormat(logId) {
 
     document.getElementById("printModalHeaderTitle").innerHTML = `<i class="bi bi-arrow-left-right me-2"></i>Formato de Traspaso - ${t.folio_traspaso}`;
     document.getElementById("printFormatArea").innerHTML = `
-        <div class="d-flex justify-content-between align-items-center border-bottom border-2 border-dark pb-2 mb-3">
+        <div style="border-top: 4px solid #8b1538; border-bottom: 2px solid #212529; padding: 10px 0; margin-bottom: 14px;" class="d-flex justify-content-between align-items-start gap-3">
             <div>
-                <h5 class="fw-bold mb-0">MÓDULOS DE ATENCIÓN CIUDADANA (050351 • 050353 • 050354)</h5>
-                <div class="fw-semibold text-pink">FORMATO DE TRASPASO / REASIGNACIÓN DE EQUIPO</div>
+                <div class="fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em; color: #6c757d;">
+                    Registro Federal de Electores • 03 Junta Distrital Ejecutiva Coahuila
+                </div>
+                <h5 class="fw-bold mb-0 mt-1">MÓDULOS DE ATENCIÓN CIUDADANA (050351 • 050353 • 050354)</h5>
+                <div class="fw-semibold text-pink mt-1">FORMATO DE TRASPASO / REASIGNACIÓN DE EQUIPO</div>
             </div>
             <div class="text-end">
-                <div class="fw-bold text-primary">FOLIO: ${t.folio_traspaso}</div>
-                <div>Fecha: ${t.fecha}</div>
+                <div class="fw-bold text-primary font-monospace">FOLIO: ${t.folio_traspaso}</div>
+                <div class="small">Fecha: ${t.fecha}</div>
             </div>
         </div>
         <div class="print-box">
             <div class="print-box-title">1. Movimiento y Origen / Destino</div>
-            <div class="row">
-                <div class="col-12 mb-1"><strong>Tipo de movimiento:</strong> ${t.tipo_movimiento}</div>
+            <div class="row g-2">
+                <div class="col-12"><strong>Tipo de movimiento:</strong> ${t.tipo_movimiento}</div>
                 <div class="col-md-6"><strong>Origen:</strong> ${t.origen_texto}</div>
                 <div class="col-md-6"><strong>Destino:</strong> ${t.destino_texto}</div>
-                ${t.oficio ? `<div class="col-12 mt-1"><strong>Oficio de referencia:</strong> <span class="font-monospace">${t.oficio}</span></div>` : ""}
+                ${t.oficio ? `<div class="col-12"><strong>Oficio de referencia:</strong> <span class="font-monospace fw-bold">${t.oficio}</span></div>` : ""}
             </div>
         </div>
         <div class="print-box">
             <div class="print-box-title">2. Datos del Bien</div>
-            <div class="row">
+            <div class="row g-2">
                 <div class="col-md-6"><strong>Componente:</strong> ${t.tipo_componente}</div>
                 <div class="col-md-6"><strong>Marca / Modelo:</strong> ${t.marca} ${t.modelo}</div>
-                <div class="col-md-6 mt-1"><strong>Serie:</strong> <span class="font-monospace fw-bold">${t.numero_serie}</span></div>
-                <div class="col-md-6 mt-1"><strong>Inventario INE:</strong> ${t.inventario_ine || "—"}</div>
+                <div class="col-md-6"><strong>Serie:</strong> <span class="font-monospace fw-bold">${t.numero_serie}</span></div>
+                <div class="col-md-6"><strong>Inventario INE:</strong> ${t.inventario_ine || "—"}</div>
             </div>
         </div>
         <div class="print-box">
