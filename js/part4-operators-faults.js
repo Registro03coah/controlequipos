@@ -256,7 +256,12 @@ export async function saveOperator(e) {
     const telefono = document.getElementById("opRegTelefono").value.trim();
     const correo_institucional = document.getElementById("opRegCorreo").value.trim().toLowerCase();
 
-    const existingStationOp = appState.operadores.find(o => normalizeUnitKey(o.modulo) === modulo && Number(o.estacion) === estacion && o.id !== editId);
+    const hiddenPhoto = document.getElementById("currentOpPhoto")?.value || "";
+    const fotoFinal = currentOpPhoto || hiddenPhoto || "";
+
+    const existingStationOp = appState.operadores.find(
+        o => normalizeUnitKey(o.modulo) === modulo && Number(o.estacion) === estacion && o.id !== editId
+    );
     if (existingStationOp) {
         const estText = `${formatUnitLabel(modulo, { short: true })} - ${formatStationLabel(estacion, false, modulo)}`;
         if (!confirm(`${estText} ya tiene asignado a ${existingStationOp.nombre_completo}. ¿Deseas reemplazarlo?`)) {
@@ -275,7 +280,7 @@ export async function saveOperator(e) {
                 nombre_completo,
                 telefono,
                 correo_institucional,
-                foto_url: currentOpPhoto || appState.operadores[idx].foto_url
+                foto_url: fotoFinal || appState.operadores[idx].foto_url || ""
             });
         }
     } else {
@@ -286,7 +291,7 @@ export async function saveOperator(e) {
             nombre_completo,
             telefono,
             correo_institucional,
-            foto_url: currentOpPhoto
+            foto_url: fotoFinal
         }));
     }
 
@@ -312,6 +317,8 @@ export function editOperator(id) {
     document.getElementById("opRegCorreo").value = op.correo_institucional;
 
     setCurrentOpPhoto(op.foto_url || "");
+    const hiddenEl = document.getElementById("currentOpPhoto");
+    if (hiddenEl) hiddenEl.value = op.foto_url || "";
     if (op.foto_url) {
         document.getElementById("opPhotoImg").src = op.foto_url;
         document.getElementById("opPhotoPreview").classList.remove("d-none");
@@ -331,6 +338,8 @@ export function resetOperatorForm({ keepModulo = null, keepEstacion = null } = {
     document.getElementById("editOpId").value = "";
     document.getElementById("opFotoInput").value = "";
     document.getElementById("opPhotoPreview").classList.add("d-none");
+    const hiddenEl = document.getElementById("currentOpPhoto");
+    if (hiddenEl) hiddenEl.value = "";
     setCurrentOpPhoto("");
     document.getElementById("opFormTitle").innerHTML = `<i class="bi bi-person-plus-fill text-danger me-2"></i>Registrar Operador / Responsable`;
     document.getElementById("btnCancelEditOp").classList.add("d-none");
